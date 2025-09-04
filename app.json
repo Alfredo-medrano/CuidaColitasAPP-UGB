@@ -2,14 +2,23 @@
   "expo": {
     "name": "Supabase",
     "slug": "Supabase",
+    "scheme": "supabaseapp",
+    "linking": {
+      "prefixes": ["supabaseapp://", "exp://192.168.0.100:8081/"],
+      "config": {
+        "screens": {
+          "ResetPassword": "reset"
+        }
+      }
+      
+    },
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Perrito_blanco.jpg", 
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "image": "./assets/welcome.jpg", 
+      "resizeMode": "contain",  
       "backgroundColor": "#ffffff"
     },
     "ios": {
@@ -17,13 +26,25 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/banner.jpg",  
+        "backgroundColor": "#ffffff"  
       },
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/banner.jpg"  
+    },
+    "extra": {
+      "supabaseUrl": "https://jjmvosegifrtbwlstzrb.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqbXZvc2VnaWZydGJ3bHN0enJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNDcwMjUsImV4cCI6MjA3MTkyMzAyNX0.B0tkZpdkkVSeZ2pt2qZTMkQja3MoIMvngA82evcPqsM"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La aplicación necesita acceso a tus fotos para que puedas seleccionar un avatar."
+        }
+      ]
+    ]
   }
 }
