@@ -25,9 +25,9 @@ export default function SignIn({ navigation }) {
       if (loginError) throw loginError;
       if (!user) throw new Error("Usuario o contraseña incorrectos.");
 
-      // 2. CORRECCIÓN: Obtener el rol desde la tabla 'profiles'
-      const { data, error: roleError } = await supabase
-        .from('profiles') // <-- CAMBIO DE TABLA
+      // 2. Obtener el rol desde la tabla 'profiles' haciendo un JOIN con 'roles'
+      const { data, error: profileError } = await supabase
+        .from('profiles')
         .select(`
           name,
           roles ( name )
@@ -35,7 +35,7 @@ export default function SignIn({ navigation }) {
         .eq('id', user.id)
         .single();
 
-      if (roleError) throw new Error("No se pudo obtener la información del perfil.");
+      if (profileError) throw new Error("No se pudo obtener la información del perfil.");
       
       const userRole = data?.roles?.name;
 
@@ -46,7 +46,10 @@ export default function SignIn({ navigation }) {
       }
     } catch (err) {
       console.error('--- ERROR DETALLADO DE SUPABASE EN SIGNIN ---', err);
-      setError(err.message || 'Ocurrió un error inesperado.');
+      const authErrorMessages = {
+        'invalid login credentials': 'Email o contraseña incorrectos.',
+      };
+      setError(authErrorMessages[err.message.toLowerCase()] || 'Ocurrió un error inesperado.');
     } finally {
         setLoading(false);
     }
@@ -58,7 +61,6 @@ export default function SignIn({ navigation }) {
       onTabChange={(t) => navigation.replace(t === 'login' ? 'SignIn' : 'SignUp', { prefillEmail: email.trim().toLowerCase() })}
       title="Welcome to CuidaColitas"
     >
-      {/* Tu JSX sin cambios */}
       <UnderlineInput
         placeholder="E-mail"
         autoCapitalize="none"
@@ -91,7 +93,6 @@ export default function SignIn({ navigation }) {
   );
 }
 
-// Tus estilos sin cambios
 const styles = StyleSheet.create({
   errorText: { color: 'red', textAlign: 'center', marginBottom: 6 },
   switchText: { textAlign: 'center', marginTop: 10, color: '#013847' },

@@ -21,15 +21,14 @@ export default function SignUp({ navigation, route }) {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
-  const onSignUp = async () => {
+   const onSignUp = async () => {
     setError('');
     setInfo('');
 
-    // --- Validaciones de los campos del formulario ---
     const emailNorm = normalize(email);
     if (!emailOk(emailNorm)) { setError('Correo inválido.'); return; }
     if (!name) { setError('El nombre es obligatorio.'); return; }
-    if (!passStrong(password)) { setError('Contraseña débil. Debe tener 8 caracteres, una mayúscula, una minúscula y un número.'); return; }
+    if (!passStrong(password)) { setError('Contraseña débil...'); return; }
     if (password !== confirm) { setError('Las contraseñas no coinciden.'); return; }
 
     setLoading(true);
@@ -43,8 +42,7 @@ export default function SignUp({ navigation, route }) {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error("No se pudo crear el usuario en el sistema de autenticación.");
 
-      // 2. Buscar el UUID del rol 'cliente' en la tabla 'roles'.
-      // CORREGIDO: Buscamos el rol 'cliente' para nuevos registros.
+      // 2. Buscar el UUID del rol 'cliente'.
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
         .select('id')
@@ -53,12 +51,12 @@ export default function SignUp({ navigation, route }) {
       
       if (roleError || !roleData) throw new Error("No se encontró el rol de cliente en la base de datos.");
 
-      // 3. CORRECCIÓN: Insertar en la tabla 'profiles' con la estructura correcta.
+      // 3. Insertar en la tabla 'profiles'
       const { error: insertError } = await supabase
-        .from('profiles') // <-- CAMBIO DE TABLA
+        .from('profiles')
         .insert({
           id: authData.user.id,
-          name: name,
+          name: name, // <-- CORRECCIÓN: De 'full_name' a 'name' para que coincida con la BD
           role_id: roleData.id,
         });
 
@@ -85,7 +83,6 @@ export default function SignUp({ navigation, route }) {
       onTabChange={(t) => navigation.replace(t === 'login' ? 'SignIn' : 'SignUp', { prefillEmail: normalize(email) })}
       title="Welcome to CuidaColitas"
     >
-      {/* Tu JSX sin cambios */}
        <UnderlineInput
         placeholder="Nombre Completo"
         value={name}
@@ -133,7 +130,6 @@ export default function SignUp({ navigation, route }) {
   );
 }
 
-// Tus estilos sin cambios
 const styles = StyleSheet.create({
   errorText: { color: 'red', textAlign: 'center', marginBottom: 6 },
   infoText: { color: 'green', textAlign: 'center', marginBottom: 6 },

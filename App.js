@@ -19,6 +19,8 @@ import AgendaDelDia from './screens/userScreen/vetShort/AgendaDelDia';
 import Mensajes from './screens/userScreen/vetShort/Mensajes';
 import NuevaCita from './screens/userScreen/vetShort/NuevaCita';
 import NuevoPaciente from './screens/userScreen/vetShort/NuevoPaciente';
+import DetallePaciente from './screens/userScreen/vetShort/DetallePaciente';
+
 
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +49,7 @@ function AppStack() {
       <Stack.Screen name="Mensajes" component={Mensajes} options={{ title: 'Mensajes' }} />
       <Stack.Screen name="NuevaCita" component={NuevaCita} options={{ title: 'Nueva Cita' }} />
       <Stack.Screen name="NuevoPaciente" component={NuevoPaciente} options={{ title: 'Nuevo Paciente' }} />
+      <Stack.Screen name="DetallePaciente" component={DetallePaciente} options={{ title: 'Detalle del Paciente' }} />
       
       {/* // <-- ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA! */}
       <Stack.Screen 
