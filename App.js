@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import React, {useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -20,7 +21,19 @@ import Mensajes from './screens/userScreen/vetShort/Mensajes';
 import NuevaCita from './screens/userScreen/vetShort/NuevaCita';
 import NuevoPaciente from './screens/userScreen/vetShort/NuevoPaciente';
 import DetallePaciente from './screens/userScreen/vetShort/DetallePaciente';
+import Notificaciones from './screens/userScreen/vetShort/Notificaciones';
+import HistorialMedico from './screens/userScreen/vetShort/HistorialMedico';
+import NuevaVisita from './screens/userScreen/vetShort/NuevaVisita';
+import NuevaVacuna from './screens/userScreen/vetShort/NuevaVacuna';
+import NuevoMedicamento from './screens/userScreen/vetShort/NuevoMedicamento';
 
+// -- CORRECTO: Importamos el componente del perfil del cliente --
+import ProfileCliente from './screens/userScreen/clienteShort/ProfileCliente';
+import EditProfileClient from './screens/userScreen/clienteShort/EditProfileClient';
+import MisCitas from './screens/userScreen/clienteShort/MisCitas';
+import SolicitarCita from './screens/userScreen/clienteShort/SolicitarCita';
+import DetalleCita from './screens/components/DetalleCita';
+import ReprogramarCita from './screens/userScreen/clienteShort/ReprogramarCita';
 
 
 const Stack = createNativeStackNavigator();
@@ -50,15 +63,37 @@ function AppStack() {
       <Stack.Screen name="NuevaCita" component={NuevaCita} options={{ title: 'Nueva Cita' }} />
       <Stack.Screen name="NuevoPaciente" component={NuevoPaciente} options={{ title: 'Nuevo Paciente' }} />
       <Stack.Screen name="DetallePaciente" component={DetallePaciente} options={{ title: 'Detalle del Paciente' }} />
-      
-      {/* // <-- ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA! */}
+      <Stack.Screen name="Notificaciones" component={Notificaciones} options={{ title: 'Notificaciones' }} />
+      <Stack.Screen name="HistorialMedico" component={HistorialMedico} options={{ title: 'Historial Médico' }} />
+      <Stack.Screen name="NuevaVisita" component={NuevaVisita} options={{ title: 'Nueva Visita' }} />
+      <Stack.Screen name="NuevaVacuna" component={NuevaVacuna} options={{ title: 'Nueva Vacuna' }} />
+      <Stack.Screen name="NuevoMedicamento" component={NuevoMedicamento} options={{ title: 'Nuevo Medicamento' }} />
+
+      <Stack.Screen name="EditProfileClient" component={EditProfileClient} options={{ title: 'Editar Perfil' }} />
+      <Stack.Screen name="MisCitas" component={MisCitas} options={{ title: 'Mis Citas' }} />
+      <Stack.Screen name="SolicitarCita" component={SolicitarCita} options={{ title: 'Solicitar Cita' }} />
+      <Stack.Screen name="ReprogramarCita" component={ReprogramarCita} options={{ title: 'Reprogramar Cita' }} />
+      <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
+
+      {/* -- PANTALLA DEL PERFIL DEL VETERINARIO -- */}
       <Stack.Screen 
         name="Profile" 
         component={Profile} 
         options={{ 
           title: 'Mi Perfil',
-          headerStyle: { backgroundColor: '#013847' }, // Color de fondo del header
-          headerTintColor: '#fff', // Color del texto y flecha de regreso
+          headerStyle: { backgroundColor: '#013847' }, 
+          headerTintColor: '#fff',
+        }} 
+      />
+      
+      {/* -- PANTALLA DEL PERFIL DEL CLIENTE -- */}
+      <Stack.Screen 
+        name="ProfileCliente" 
+        component={ProfileCliente} 
+        options={{ 
+          title: 'Mi Perfil',
+          headerStyle: { backgroundColor: '#43C0AF' }, 
+          headerTintColor: '#fff',
         }} 
       />
       <Stack.Screen 
@@ -72,26 +107,22 @@ function AppStack() {
   );
 }
 
-// --- COMPONENTE PRINCIPAL DE LA APP ---
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
 
   useEffect(() => {
-    // Revisa la sesión al iniciar la app
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Escucha los cambios de sesión (login/logout)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
       }
     );
 
-    // Limpia el listener al desmontar el componente
     return () => {
       authListener.subscription.unsubscribe();
     };
@@ -107,7 +138,6 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      {/* Muestra el stack de Autenticación o el de la App según el estado de la sesión */}
       {session && session.user ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );

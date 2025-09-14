@@ -4,7 +4,7 @@ import { View, Text, ImageBackground, StyleSheet, Pressable, KeyboardAvoidingVie
 export default function AuthLayout({ activeTab, onTabChange, title, children }) {
   return (
     <ImageBackground
-      source={require('../../assets/welcome.jpg')}
+      source={require('../../assets/welcome.png')}
       style={styles.bg}
       resizeMode="cover"
     >
@@ -25,7 +25,7 @@ export default function AuthLayout({ activeTab, onTabChange, title, children }) 
           </View>
 
           <View style={styles.logoWrap}>
-            <Image source={require('../../assets/banner.jpg')} style={{ width: 140, height: 40, resizeMode: 'contain' }} />
+            <Image source={require('../../assets/banner.png')} style={{ width: 140, height: 40, resizeMode: 'contain' }} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

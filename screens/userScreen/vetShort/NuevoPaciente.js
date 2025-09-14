@@ -4,28 +4,22 @@ import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../../Supabase';
 
 export default function NuevoPaciente({ navigation }) {
-  // Estados para la información de la Mascota
   const [petName, setPetName] = useState('');
   const [speciesId, setSpeciesId] = useState(null);
   const [breed, setBreed] = useState('');
   const [sex, setSex] = useState('');
-  
-  // Estados para la lista de clientes
   const [clients, setClients] = useState([]);
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [speciesList, setSpeciesList] = useState([]);
 
-  // Cargar la lista de clientes y especies al abrir la pantalla
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Cargar Especies
         const { data: speciesData, error: speciesError } = await supabase.from('pet_species').select('id, name');
         if (speciesError) throw speciesError;
         setSpeciesList(speciesData);
 
-        // Cargar Clientes
         const { data: roleData, error: roleError } = await supabase.from('roles').select('id').eq('name', 'cliente').single();
         if (roleError) throw roleError;
 
@@ -58,8 +52,6 @@ export default function NuevoPaciente({ navigation }) {
     try {
       const { data: { user: vetUser } } = await supabase.auth.getUser();
       if (!vetUser) throw new Error("No se pudo identificar al veterinario.");
-
-      // Insertamos la nueva mascota con los IDs correctos
       const { error } = await supabase
         .from('pets')
         .insert({
@@ -67,8 +59,8 @@ export default function NuevoPaciente({ navigation }) {
           species_id: speciesId,
           breed,
           sex,
-          owner_id: selectedClientId, // ID del cliente seleccionado
-          primary_vet_id: vetUser.id,   // ID del veterinario logueado
+          owner_id: selectedClientId,
+          primary_vet_id: vetUser.id,  
         });
 
       if (error) throw error;
@@ -92,8 +84,6 @@ export default function NuevoPaciente({ navigation }) {
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Nuevo Paciente</Text>
-
-      {/* --- Selector de Dueño --- */}
       <View style={styles.formGroup}>
         <Text style={styles.label}>Dueño del Paciente</Text>
         <View style={styles.pickerContainer}>
@@ -109,7 +99,6 @@ export default function NuevoPaciente({ navigation }) {
         </View>
       </View>
 
-      {/* --- Información de la Mascota --- */}
       <View style={styles.formGroup}>
         <Text style={styles.label}>Información de la Mascota</Text>
         <TextInput style={styles.input} placeholder="Nombre de la mascota" value={petName} onChangeText={setPetName} />
@@ -146,7 +135,6 @@ export default function NuevoPaciente({ navigation }) {
   );
 }
 
-// --- Estilos ---
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#E2ECED' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#013847', marginBottom: 20 },

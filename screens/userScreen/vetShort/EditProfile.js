@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, Activi
 import { supabase } from '../../../Supabase';
 import * as ImagePicker from 'expo-image-picker';
 import Icon from 'react-native-vector-icons/FontAwesome5';
+import { Picker } from '@react-native-picker/picker';
 
 export default function EditProfile({ route, navigation }) {
   const { profile: initialProfile } = route.params;
@@ -20,8 +21,11 @@ export default function EditProfile({ route, navigation }) {
   const [specialties, setSpecialties] = useState([]);
   const [newSpecialty, setNewSpecialty] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [clinics, setClinics] = useState([]);
+  const [selectedClinicId, setSelectedClinicId] = useState(null);
 
   useEffect(() => {
+    // Cargar datos del perfil en el formulario
     if (initialProfile) {
       setName(initialProfile.name || '');
       setTitle(initialProfile.title || '');
@@ -31,10 +35,23 @@ export default function EditProfile({ route, navigation }) {
       setBiography(initialProfile.biography || '');
       setSpecialties(initialProfile.specialties || []);
       setAvatarUrl(initialProfile.avatar_url || null);
+      setSelectedClinicId(initialProfile.clinic_id);
     }
+
+    // Cargar la lista de clínicas
+    const fetchClinics = async () => {
+      const { data, error } = await supabase.from('clinics').select('id, name');
+      if (error) {
+        console.error("Error cargando clínicas:", error);
+      } else {
+        setClinics(data);
+      }
+    };
+
+    fetchClinics();
   }, [initialProfile]);
 
-  // --- Lógica para gestionar especialidades (COMPLETADA) ---
+  // Lógica para gestionar especialidades
   const addSpecialty = () => {
     const trimmedSpecialty = newSpecialty.trim();
     if (trimmedSpecialty && !specialties.includes(trimmedSpecialty)) {
@@ -46,7 +63,7 @@ export default function EditProfile({ route, navigation }) {
     setSpecialties(specialties.filter((_, index) => index !== indexToRemove));
   };
 
-  // --- Lógica para la foto de perfil (COMPLETADA) ---
+  // Lógica para la foto de perfil
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -91,7 +108,7 @@ export default function EditProfile({ route, navigation }) {
     }
   };
 
-  // --- Lógica para guardar todos los cambios (COMPLETADA) ---
+  // Lógica para guardar todos los cambios
   const handleUpdateProfile = async () => {
     try {
       setSaving(true);
@@ -109,6 +126,7 @@ export default function EditProfile({ route, navigation }) {
         specialties,
         avatar_url: avatarUrl,
         role_id: initialProfile.role_id,
+        clinic_id: selectedClinicId,
         updated_at: new Date(),
       };
 
@@ -128,7 +146,6 @@ export default function EditProfile({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      {/* ... (Tu JSX completo se queda igual, ahora las funciones están conectadas) ... */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Foto de Perfil</Text>
         <View style={styles.avatarContainer}>
@@ -145,12 +162,25 @@ export default function EditProfile({ route, navigation }) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Información Personal</Text>
+        <Text style={styles.cardTitle}>Información Personal y Profesional</Text>
         <Text style={styles.label}>Nombre Completo</Text>
         <TextInput style={styles.input} value={name} onChangeText={setName} />
         
         <Text style={styles.label}>Título Profesional</Text>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} />
+        
+        <Text style={styles.label}>Clínica</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={selectedClinicId}
+            onValueChange={(itemValue) => setSelectedClinicId(itemValue)}
+          >
+            <Picker.Item label="-- Selecciona una clínica --" value={null} />
+            {clinics.map((clinic) => (
+              <Picker.Item key={clinic.id} label={clinic.name} value={clinic.id} />
+            ))}
+          </Picker>
+        </View>
         
         <View style={styles.row}>
             <View style={styles.col}>
@@ -222,27 +252,12 @@ export default function EditProfile({ route, navigation }) {
   );
 }
 
-// Tus Estilos
+// --- Estilos ---
 const styles = StyleSheet.create({
-    container: { flex: 1, 
-    backgroundColor: '#013847' },
-
-    card: { backgroundColor: '#fff',
-    borderRadius: 16, 
-    padding: 20, 
-    marginHorizontal: 15, 
-    marginBottom: 15 },
-
-    cardTitle: { 
-    fontSize: 18, 
-    fontWeight: '600', 
-    color: '#333', 
-    marginBottom: 20 },
-
-    avatarContainer: {
-    alignSelf: 'center', 
-    marginBottom: 15 },
-    
+    container: { flex: 1, backgroundColor: '#013847' },
+    card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginHorizontal: 15, marginBottom: 15 },
+    cardTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 20 },
+    avatarContainer: { alignSelf: 'center', marginBottom: 15 },
     avatar: { width: 100, height: 100, borderRadius: 50 },
     avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#e1e1e1', justifyContent: 'center', alignItems: 'center' },
     photoButton: { flexDirection: 'row', padding: 12, borderRadius: 8, backgroundColor: '#013847', alignItems: 'center', justifyContent: 'center' },
@@ -251,6 +266,7 @@ const styles = StyleSheet.create({
     readOnly: { backgroundColor: '#eee', color: '#888' },
     row: { flexDirection: 'row', justifyContent: 'space-between', gap: 15, marginTop: 15 },
     col: { flex: 1 },
+    pickerContainer: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, marginBottom: 15, backgroundColor: '#f9f9f9', justifyContent: 'center' },
     specialtiesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
     specialtyTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e1e1e1', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8, marginBottom: 8 },
     specialtyText: { color: '#333' },

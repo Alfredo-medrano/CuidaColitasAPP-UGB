@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.pyas.supabase'
+    namespace 'com.pyas.Supabase'
     defaultConfig {
-        applicationId 'com.pyas.supabase'
+        applicationId 'com.pyas.Supabase'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

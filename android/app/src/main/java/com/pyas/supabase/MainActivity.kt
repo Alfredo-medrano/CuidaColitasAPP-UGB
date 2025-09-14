@@ -1,4 +1,4 @@
-package com.pyas.supabase
+package com.pyas.Supabase
 
 import android.os.Build
 import android.os.Bundle

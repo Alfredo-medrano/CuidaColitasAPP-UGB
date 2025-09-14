@@ -4,20 +4,22 @@ import { supabase } from '../../Supabase';
 import AuthLayout from '../components/AuthLayout';
 import { UnderlineInput, PrimaryButton, EyeToggle } from '../components/FormBits.js';
 
-// Función para validar la fortaleza de la contraseña
+
 const passStrong = (p) => /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/.test(p);
 
-// Recibimos 'route' para acceder a los parámetros de navegación
 export default function ResetPassword({ navigation, route }) {
-  // Obtenemos el email que pasamos desde la pantalla anterior
   const { email } = route.params;
 
   const [token, setToken] = React.useState('');
+
   const [p1, setP1] = React.useState('');
   const [p2, setP2] = React.useState('');
+
   const [show1, setShow1] = React.useState(false);
   const [show2, setShow2] = React.useState(false);
+
   const [loading, setLoading] = React.useState(false);
+
   const [msg, setMsg] = React.useState('');
   const [err, setErr] = React.useState('');
 
@@ -27,8 +29,6 @@ export default function ResetPassword({ navigation, route }) {
     if (!token) { setErr('Ingresa el código que recibiste.'); return; }
     if (!p1 || !p2) { setErr('Llena ambas contraseñas.'); return; }
     if (p1 !== p2) { setErr('Las contraseñas no coinciden.'); return; }
-    
-    // CORRECCIÓN 1: Añadimos la validación de contraseña fuerte
     if (!passStrong(p1)) {
       setErr('Contraseña débil. Debe tener 8+ caracteres, una mayúscula, una minúscula y un número.');
       return;
@@ -36,7 +36,6 @@ export default function ResetPassword({ navigation, route }) {
     
     try {
       setLoading(true);
-      // PASO 1: Verificar el código (token)
       const { error: otpError } = await supabase.auth.verifyOtp({
         email: email,
         token: token,
@@ -44,17 +43,11 @@ export default function ResetPassword({ navigation, route }) {
       });
 
       if (otpError) throw otpError;
-
-      // PASO 2: Si el código fue válido, actualizar la contraseña (esto también inicia sesión)
       const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
       
       if (updateError) throw updateError;
       
       setMsg('Contraseña actualizada con éxito. Redirigiendo...');
-      
-      // CORRECCIÓN 2: Eliminamos la navegación manual para evitar el error.
-      // App.js se encargará de llevar al usuario a la pantalla Home automáticamente.
-      // setTimeout(() => navigation.replace('SignIn'), 1500);
 
     } catch (e) {
       setErr('Código inválido o expirado.');

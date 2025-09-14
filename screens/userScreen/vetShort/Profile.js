@@ -10,15 +10,12 @@ export default function Profile({ navigation }) {
   const isFocused = useIsFocused();
 
   React.useEffect(() => {
-    // Esta función se ejecutará cada vez que la pantalla esté en foco
     if (isFocused) {
       const fetchProfile = async () => {
         setLoading(true);
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error("Usuario no encontrado");
-
-          // 1. CORRECCIÓN: La consulta ahora es más simple y correcta
           const { data, error } = await supabase
             .from('profiles')
             .select(`
@@ -30,10 +27,9 @@ export default function Profile({ navigation }) {
 
           if (error) throw error;
           
-          // 2. CORRECCIÓN: Combinamos la información de forma más directa
           const fullProfile = {
             ...data,
-            role: data.roles.name, // El rol viene de la tabla anidada 'roles'
+            role: data.roles.name,
             email: user.email,
           };
           setProfile(fullProfile);
@@ -64,7 +60,6 @@ export default function Profile({ navigation }) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        {/* Lógica para mostrar la foto de perfil o un ícono por defecto */}
         {profile.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
         ) : (
@@ -114,7 +109,6 @@ export default function Profile({ navigation }) {
   );
 }
 
-// --- Estilos ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#013847' },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#013847' },

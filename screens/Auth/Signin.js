@@ -16,17 +16,22 @@ export default function SignIn({ navigation }) {
     setLoading(true);
 
     try {
-      // 1. Iniciar sesión en Supabase Auth
-      const { data: { user }, error: loginError } = await supabase.auth.signInWithPassword({
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (loginError) throw loginError;
-      if (!user) throw new Error("Usuario o contraseña incorrectos.");
+      if (loginError) {
+        throw loginError;
+      }
 
-      // 2. Obtener el rol desde la tabla 'profiles' haciendo un JOIN con 'roles'
-      const { data, error: profileError } = await supabase
+      // Desestructuramos user de forma segura para evitar el error 'NONE'
+      const user = data?.user;
+      if (!user) {
+        throw new Error("Usuario o contraseña incorrectos.");
+      }
+      
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select(`
           name,
@@ -35,9 +40,11 @@ export default function SignIn({ navigation }) {
         .eq('id', user.id)
         .single();
 
-      if (profileError) throw new Error("No se pudo obtener la información del perfil.");
+      if (profileError) {
+        throw new Error("No se pudo obtener la información del perfil.");
+      }
       
-      const userRole = data?.roles?.name;
+      const userRole = profileData?.roles?.name;
 
       if (userRole === 'veterinario' || userRole === 'cliente') {
         navigation.replace('Home');
@@ -49,9 +56,11 @@ export default function SignIn({ navigation }) {
       const authErrorMessages = {
         'invalid login credentials': 'Email o contraseña incorrectos.',
       };
-      setError(authErrorMessages[err.message.toLowerCase()] || 'Ocurrió un error inesperado.');
+      
+      const errorMessage = err.message || 'Ocurrió un error inesperado.';
+      setError(authErrorMessages[errorMessage.toLowerCase()] || errorMessage);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 

@@ -22,25 +22,16 @@ export default function ForgotPassword({ navigation, route }) {
 
     setLoading(true);
     try {
-      // 1. Llamamos a la función y guardamos la respuesta
       const { error } = await supabase.auth.resetPasswordForEmail(e);
-
-      // 2. Verificamos si Supabase devolvió un error
       if (error) {
-        // Si hay un error, lo lanzamos para que lo capture el bloque catch
         throw error;
       }
-      
-      // 3. Si no hubo error, la solicitud fue exitosa y navegamos
       navigation.navigate('ResetPassword', { email: e });
 
     } catch (error) {
-      // Mostramos un error genérico al usuario
       setErr('No se pudo enviar el correo. Revisa la dirección e intenta de nuevo.');
-      // Opcional: imprimimos el error real en la consola para depuración
       console.error('Error al enviar correo de recuperación:', error.message);
     } finally {
-      // 4. Usamos 'finally' para asegurar que el loading se detenga siempre
       setLoading(false);
     }
   };

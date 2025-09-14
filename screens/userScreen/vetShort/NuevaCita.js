@@ -1,4 +1,4 @@
-import React, {useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator, TextInput, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -6,6 +6,7 @@ import { supabase } from '../../../Supabase';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 
 export default function NuevaCita({ navigation }) {
+  // --- Estados del Formulario ---
   const [pets, setPets] = useState([]);
   const [selectedPetId, setSelectedPetId] = useState(null);
   const [date, setDate] = useState(new Date());
@@ -38,7 +39,7 @@ export default function NuevaCita({ navigation }) {
     loadPets();
   }, []);
 
-  // Handlers para el selector de fecha y hora
+  // --- Handlers para el selector de fecha y hora ---
   const onChangeDate = (event, selectedDate) => {
     setShowPicker({ ...showPicker, date: false });
     setDate(selectedDate || date);
@@ -48,6 +49,7 @@ export default function NuevaCita({ navigation }) {
     setTime(selectedTime || time);
   };
 
+  // --- Lógica para Guardar la Cita y Crear Notificación ---
   const handleSubmit = async () => {
     if (!selectedPetId) {
       Alert.alert("Error", "Debes seleccionar un paciente.");
@@ -90,8 +92,8 @@ export default function NuevaCita({ navigation }) {
         time.getMinutes()
       );
 
-      // 5. Insertar la cita con todos los datos correctos
-      const { error: insertError } = await supabase
+      // 5. Insertar la cita y obtener su ID
+      const { data: newAppointment, error: insertError } = await supabase
         .from('appointments')
         .insert({
           pet_id: selectedPetId,
@@ -101,11 +103,28 @@ export default function NuevaCita({ navigation }) {
           status_id: statusData.id,
           appointment_time: appointmentTime.toISOString(),
           reason,
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
 
-      Alert.alert("Éxito", "La cita ha sido programada.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+      // 6. Crear la notificación para el CLIENTE
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: selectedPet.owner_id,
+          type: 'new_appointment',
+          title: 'Nueva Cita Programada',
+          content: `Se agendó una cita para ${selectedPet.name} el ${appointmentTime.toLocaleDateString('es-ES')}.`,
+          link_id: newAppointment.id
+        });
+
+      if (notificationError) {
+        console.error("Error al crear la notificación:", notificationError.message);
+      }
+
+      Alert.alert("Éxito", "La cita ha sido programada y el cliente notificado.", [{ text: "OK", onPress: () => navigation.goBack() }]);
 
     } catch (error) {
       console.error('Error al crear cita:', error.message);

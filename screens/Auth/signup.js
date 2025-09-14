@@ -3,8 +3,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { supabase } from '../../Supabase.js';
 import AuthLayout from '../components/AuthLayout.js';
 import { UnderlineInput, PrimaryButton, EyeToggle } from '../components/FormBits.js';
-
-// --- Funciones de validación ---
 const emailOk = (e) => /\S+@\S+\.\S+/.test(e);
 const passStrong = (p) => /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/.test(p);
 const normalize = (s) => String(s || '').trim().toLowerCase();
@@ -21,19 +19,18 @@ export default function SignUp({ navigation, route }) {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
-   const onSignUp = async () => {
+  const onSignUp = async () => {
     setError('');
     setInfo('');
 
     const emailNorm = normalize(email);
     if (!emailOk(emailNorm)) { setError('Correo inválido.'); return; }
     if (!name) { setError('El nombre es obligatorio.'); return; }
-    if (!passStrong(password)) { setError('Contraseña débil...'); return; }
+    if (!passStrong(password)) { setError('La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.'); return; }
     if (password !== confirm) { setError('Las contraseñas no coinciden.'); return; }
 
     setLoading(true);
     try {
-      // 1. Crear el usuario en Supabase Auth.
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: emailNorm,
         password,
@@ -42,27 +39,25 @@ export default function SignUp({ navigation, route }) {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error("No se pudo crear el usuario en el sistema de autenticación.");
 
-      // 2. Buscar el UUID del rol 'cliente'.
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
         .select('id')
-        .eq('name', 'veterinario')
+        .eq('name', 'cliente')
         .single();
-      
-      if (roleError || !roleData) throw new Error("No se encontró el rol de cliente en la base de datos.");
 
-      // 3. Insertar en la tabla 'profiles'
+      if (roleError || !roleData) throw new Error("Error al obtener el rol de cliente. Por favor, contacta al soporte.");
+
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({
           id: authData.user.id,
-          name: name, // <-- CORRECCIÓN: De 'full_name' a 'name' para que coincida con la BD
+          name: name,
           role_id: roleData.id,
         });
 
       if (insertError) throw insertError;
 
-      setInfo('Te enviamos un correo para confirmar tu cuenta.');
+      setInfo('¡Registro exitoso! Te enviamos un correo para confirmar tu cuenta.');
 
     } catch (err) {
       console.error('--- ERROR DETALLADO DE SUPABASE EN SIGNUP ---', err);
@@ -70,7 +65,7 @@ export default function SignUp({ navigation, route }) {
       if (msg.includes("already registered")) {
         setError('Ese correo ya está registrado. Inicia sesión.');
       } else {
-        setError(err.message || 'Ocurrió un error inesperado.');
+        setError('Ocurrió un error inesperado. Por favor, intenta de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -83,7 +78,8 @@ export default function SignUp({ navigation, route }) {
       onTabChange={(t) => navigation.replace(t === 'login' ? 'SignIn' : 'SignUp', { prefillEmail: normalize(email) })}
       title="Welcome to CuidaColitas"
     >
-       <UnderlineInput
+      {/* ... el resto del JSX se mantiene igual ... */}
+      <UnderlineInput
         placeholder="Nombre Completo"
         value={name}
         onChangeText={setName}

@@ -1,140 +1,187 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 import { supabase } from '../../../Supabase';
-import Navbar from './../../components/Navbar'; // Asegúrate que esta ruta es correcta
-import { useIsFocused } from '@react-navigation/native'; // <-- Añadir useIsFocused
+import Navbar from './../../components/Navbar';
+import { useIsFocused } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Objeto para mapear tipos de notificación a íconos y colores.
+const notificationStyles = {
+  vaccine_due: { icon: 'syringe', color: '#f8d7da', iconColor: '#721c24' },
+  new_appointment: { icon: 'calendar-plus', color: '#d1ecf1', iconColor: '#0c5460' },
+  appointment_reminder: { icon: 'calendar-check', color: '#d1ecf1', iconColor: '#0c5460' },
+  new_message: { icon: 'comment-dots', color: '#e2d9f3', iconColor: '#492c7c' },
+  medical_checkup: { icon: 'heartbeat', color: '#fff3cd', iconColor: '#856404' },
+  app_update: { icon: 'info-circle', color: '#d4d4d4', iconColor: '#383d41' },
+};
 
 export default function VeterinarioHome({ navigation }) {
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({ appointments: 0, messages: 0 });
   const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const isFocused = useIsFocused(); // Hook para saber si la pantalla está visible
+  const isFocused = useIsFocused();
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Usuario no encontrado");
+
+      const [
+        profileRes,
+        messagesRes,
+        notificationsRes,
+        unreadNotifRes,
+        statusRes
+      ] = await Promise.all([
+        // CORRECCIÓN: Usamos 'full_name' para que coincida con la base de datos
+        supabase.from('profiles').select(`name, title`).eq('id', authUser.id).single(),
+        supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', authUser.id).eq('is_read', false),
+        supabase.from('notifications').select('*').eq('user_id', authUser.id).order('created_at', { ascending: false }).limit(3),
+        supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', authUser.id).eq('is_read', false),
+        supabase.from('appointment_status').select('id').eq('status', 'Programada').single()
+      ]);
+
+      if (profileRes.error) throw profileRes.error;
+      setProfile(profileRes.data);
+
+      const scheduledStatusId = statusRes.data?.id;
+      let appointmentCount = 0;
+      if (scheduledStatusId) {
+        const { count, error } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('vet_id', authUser.id)
+          .eq('status_id', scheduledStatusId);
+        if (error) throw error;
+        appointmentCount = count;
+      }
+      
+      setStats({ appointments: appointmentCount || 0, messages: messagesRes.count || 0 });
+      setNotifications(notificationsRes.data || []);
+      setUnreadNotifCount(unreadNotifRes.count || 0);
+
+    } catch (error) {
+      console.error('Error al cargar datos del dashboard:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Se ejecutará cada vez que la pantalla se muestre
     if (isFocused) {
-      const fetchDashboardData = async () => {
-        try {
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          if (!authUser) throw new Error("Usuario no encontrado");
-
-          // 1. CORRECCIÓN: Obtenemos también el 'title' para el Navbar
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select(`name, title`)
-            .eq('id', authUser.id)
-            .single();
-          if (profileError) throw profileError;
-          setProfile(profileData);
-
-          // (El resto de tu lógica para citas y mensajes se queda igual)
-          const { count: appointmentCount } = await supabase
-            .from('appointments')
-            .select('*', { count: 'exact', head: true })
-            .eq('veterinarian_id', authUser.id)
-            .eq('status', 'pendiente');
-          
-          const { count: messageCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('receiver_id', authUser.id);
-          
-          setStats({ appointments: appointmentCount || 0, messages: messageCount || 0 });
-
-        } catch (error) {
-          console.error('Error al cargar datos del dashboard:', error.message);
-        } finally {
-          setLoading(false);
-        }
-      };
-
       fetchDashboardData();
     }
-  }, [isFocused]); // El efecto se ejecuta cuando la pantalla gana foco
+    
+    const channel = supabase
+      .channel('public:notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, 
+        (payload) => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isFocused, fetchDashboardData]);
 
   const handleNotifications = () => {
-    // Aquí puedes navegar a una pantalla de notificaciones
-    console.log('Botón de notificaciones presionado');
+    navigation.navigate('Notificaciones');
   };
 
   if (loading) {
-    // ... tu JSX de carga
+    return (
+      <View style={styles.appContainer}>
+        <ActivityIndicator style={{flex: 1}} size="large" color="#013847" />
+      </View>
+    );
   }
 
   return (
-    <View style={styles.appContainer}>
-      {/* 2. CORRECCIÓN: Pasamos todas las props necesarias al Navbar */}
+    <SafeAreaView style={styles.appContainer} edges={['top']}> 
       <Navbar 
+        // CORRECCIÓN: Pasamos 'full_name' al Navbar
         userName={profile?.name || 'Cargando...'}
         userTitle={profile?.title || 'Veterinario'}
         onProfileClick={() => navigation.navigate('Profile')}
         onNotificationsClick={handleNotifications}
+        notificationCount={unreadNotifCount}
       />
       
-     
-      <ScrollView style={styles.content}>
-        <View style={styles.statsContainer}>
-          <View style={[styles.stat, styles.statYellow]}>
-            <Icon name="clock" size={30} color="#fff" />
-            <Text style={styles.statTitle}>{stats.appointments}</Text>
-            <Text style={styles.statText}>Citas Pendientes</Text>
-          </View>
-          <View style={[styles.stat, styles.statPurple]}>
-            <Icon name="comment-dots" size={30} color="#fff" />
-            <Text style={styles.statTitle}>{stats.messages}</Text>
-            <Text style={styles.statText}>Mensajes Nuevos</Text>
-          </View>
-        </View>
-
-        <View style={styles.notificationsSection}>
-          <Text style={styles.sectionTitle}>Notificaciones</Text>
-          {notifications.map(notification => (
-            <View key={notification.id} style={styles.notificationCard}>
-              <Icon
-                name={notification.type === 'warning' ? 'exclamation-triangle' : 'info-circle'}
-                size={20}
-                color={notification.type === 'warning' ? '#FF9800' : '#2196F3'}
-              />
-              <View style={styles.notificationText}>
-                <Text style={styles.notificationMessage}>{notification.message}</Text>
-                <Text style={styles.notificationTime}>{notification.time}</Text>
+      <ScrollView>
+        <View style={styles.content}>
+            <View style={styles.statsContainer}>
+              <View style={[styles.stat, styles.statYellow]}>
+                <Icon name="clock" size={30} color="#fff" />
+                <Text style={styles.statTitle}>{stats.appointments}</Text>
+                <Text style={styles.statText}>Citas Pendientes</Text>
+              </View>
+              <View style={[styles.stat, styles.statPurple]}>
+                <Icon name="comment-dots" size={30} color="#fff" />
+                <Text style={styles.statTitle}>{stats.messages}</Text>
+                <Text style={styles.statText}>Mensajes Nuevos</Text>
               </View>
             </View>
-          ))}
-        </View>
 
-        <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
-        <View style={styles.quickActions}>
-          <Pressable style={[styles.quickActionCard, styles.quickActionGreen]} onPress={() => navigation.navigate('MisPacientes')}>
-            <Icon name="user-md" size={30} color="#fff" />
-            <Text style={styles.cardText}>Ver Pacientes</Text>
-          </Pressable>
-          <Pressable style={[styles.quickActionCard, styles.quickActionBlue]} onPress={() => navigation.navigate('AgendaDelDia')}>
-            <Icon name="calendar-alt" size={30} color="#fff" />
-            <Text style={styles.cardText}>Agenda del Día</Text>
-          </Pressable>
-          <Pressable style={[styles.quickActionCard, styles.quickActionPurple]} onPress={() => navigation.navigate('Mensajes')}>
-            <Icon name="comments" size={30} color="#fff" />
-            <Text style={styles.cardText}>Mensajes</Text>
-          </Pressable>
-          <Pressable style={[styles.quickActionCard, styles.quickActionYellow]} onPress={() => navigation.navigate('NuevaCita')}>
-            <Icon name="plus" size={30} color="#fff" />
-            <Text style={styles.cardText}>Nueva Cita</Text>
-          </Pressable>
+            <View style={styles.notificationsSection}>
+              <Text style={styles.sectionTitle}>Actividad Reciente</Text>
+              {notifications.length > 0 ? notifications.map(notification => {
+                  // MEJORA: Hacemos que el ícono y color sean dinámicos
+                  const styleInfo = notificationStyles[notification.type] || notificationStyles['app_update'];
+                  return (
+                    <View key={notification.id} style={styles.notificationCard}>
+                      <View style={[styles.iconContainer, { backgroundColor: styleInfo.color }]}>
+                          <Icon name={styleInfo.icon} size={20} color={styleInfo.iconColor} />
+                      </View>
+                      <View style={styles.notificationText}>
+                        <Text style={styles.notificationMessage}>{notification.title}</Text>
+                        <Text style={styles.notificationTime}>{notification.content}</Text>
+                      </View>
+                    </View>
+                  );
+                }) : (
+                <View style={styles.notificationCard}>
+                  <Text style={{color: '#666'}}>No hay notificaciones recientes.</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+            <View style={styles.quickActions}>
+              <Pressable style={[styles.quickActionCard, styles.quickActionGreen]} onPress={() => navigation.navigate('MisPacientes')}>
+                <Icon name="paw" size={30} color="#fff" />
+                <Text style={styles.cardText}>Pacientes</Text>
+              </Pressable>
+              <Pressable style={[styles.quickActionCard, styles.quickActionBlue]} onPress={() => navigation.navigate('AgendaDelDia')}>
+                <Icon name="calendar-alt" size={30} color="#fff" />
+                <Text style={styles.cardText}>Agenda</Text>
+              </Pressable>
+              <Pressable style={[styles.quickActionCard, styles.quickActionPurple]} onPress={() => navigation.navigate('Mensajes')}>
+                <Icon name="comments" size={30} color="#fff" />
+                <Text style={styles.cardText}>Mensajes</Text>
+              </Pressable>
+              <Pressable style={[styles.quickActionCard, styles.quickActionYellow]} onPress={() => navigation.navigate('NuevaCita')}>
+                <Icon name="plus" size={30} color="#fff" />
+                <Text style={styles.cardText}>Nueva Cita</Text>
+              </Pressable>
+            </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+// TU HOJA DE ESTILOS ORIGINAL
 const styles = StyleSheet.create({
   appContainer: {
     flex: 1,
     backgroundColor: '#013847d3',
   },
   content: {
-    marginTop: 60,  
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
@@ -156,6 +203,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  // Añadido para el mapeo de estilos dinámicos
+  iconContainer: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginRight: 15 
+  },
   notificationText: {
     marginLeft: 10,
     flex: 1,
@@ -171,13 +227,14 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 15,
     gap: 12,
+    marginTop: 20,
   },
   stat: {
     flex: 1,
     alignItems: 'center',
-    padding: 20,
+    padding: 10,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },

@@ -7,23 +7,18 @@ import Icon from 'react-native-vector-icons/FontAwesome5';
 
 export default function DetallePaciente({ navigation, route }) {
   const { petId, mode, userRole } = route.params;
-  
-  // Estados para la información de la Mascota
   const [petName, setPetName] = useState('');
   const [speciesId, setSpeciesId] = useState(null);
   const [breed, setBreed] = useState('');
   const [sex, setSex] = useState('');
-  const [birthDate, setBirthDate] = useState(new Date()); // 2. Usar un objeto Date
-  const [showDatePicker, setShowDatePicker] = useState(false); // 3. Estado para mostrar/ocultar
+  const [birthDate, setBirthDate] = useState(new Date()); 
+  const [showDatePicker, setShowDatePicker] = useState(false); 
   const [weightKg, setWeightKg] = useState('');
   const [color, setColor] = useState('');
   const [isNeutered, setIsNeutered] = useState(false);
   
-  // Estados para el Dueño
   const [ownerName, setOwnerName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
-
-  // Estados de la UI
   const [speciesList, setSpeciesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(mode === 'edit');
@@ -44,12 +39,10 @@ export default function DetallePaciente({ navigation, route }) {
           .single();
         if (petError) throw petError;
 
-        // Poblar el estado del formulario con los datos de la BD
         setPetName(petData.name);
         setSpeciesId(petData.species_id);
         setBreed(petData.breed || '');
         setSex(petData.sex || '');
-        // 4. Convertir la fecha de texto de la BD a un objeto Date
         setBirthDate(petData.birth_date ? new Date(petData.birth_date) : new Date());
         setWeightKg(petData.weight_kg ? String(petData.weight_kg) : '');
         setColor(petData.color || '');
@@ -67,7 +60,6 @@ export default function DetallePaciente({ navigation, route }) {
     loadPetDetails();
   }, [petId]);
 
-  // 5. Nueva función para manejar el cambio de fecha
   const onChangeDate = (event, selectedDate) => {
     const currentDate = selectedDate || birthDate;
     setShowDatePicker(Platform.OS === 'ios');
@@ -87,8 +79,7 @@ export default function DetallePaciente({ navigation, route }) {
         species_id: speciesId,
         breed: breed,
         sex: sex,
-        // 6. Formatear la fecha correctamente antes de guardar
-        birth_date: birthDate.toISOString().split('T')[0], // Formato YYYY-MM-DD
+        birth_date: birthDate.toISOString().split('T')[0], 
         weight_kg: parseFloat(weightKg) || null,
         color: color,
         is_neutered: isNeutered,
@@ -120,7 +111,7 @@ export default function DetallePaciente({ navigation, route }) {
           <Icon name="arrow-left" size={20} color="#013847" />
         </Pressable>
         <Text style={styles.headerTitle}>{isEditing ? 'Editar Paciente' : 'Ver Paciente'}</Text>
-        {mode === 'view' && userRole === 'veterinario' && ( // Solo veterinarios pueden editar desde aquí si están viendo
+        {mode === 'view' && userRole === 'veterinario' && ( 
           <Pressable style={styles.editButton} onPress={() => setIsEditing(true)}>
             <Icon name="edit" size={18} color="#013847" />
             <Text style={styles.editButtonText}>Editar</Text>
@@ -129,15 +120,12 @@ export default function DetallePaciente({ navigation, route }) {
         {(mode === 'edit' || isEditing) && <View style={styles.editButtonPlaceholder} />}
       </View>
 
-      {/* Información del Propietario (solo lectura aquí) */}
       <View style={styles.formGroup}>
         <Text style={styles.groupTitle}>Información del Propietario</Text>
         <Text style={styles.infoText}>Nombre: {ownerName}</Text>
         <Text style={styles.infoText}>Teléfono: {ownerPhone || 'N/A'}</Text>
-        {/* Aquí podrías añadir un botón para 'Ver Perfil del Dueño' si tienes una pantalla para ello */}
       </View>
 
-      {/* Información de la Mascota */}
       <View style={styles.formGroup}>
         <Text style={styles.groupTitle}>Información de la Mascota</Text>
         <TextInput
@@ -230,8 +218,8 @@ export default function DetallePaciente({ navigation, route }) {
       {isEditing && (
         <View style={styles.buttonsContainer}>
           <Pressable style={styles.cancelButton} onPress={() => {
-            if (mode === 'edit') navigation.goBack(); // Si venía de editar, regresa
-            else setIsEditing(false); // Si cambió de modo 'view', vuelve a view
+            if (mode === 'edit') navigation.goBack(); 
+            else setIsEditing(false); 
           }} disabled={loading}>
             <Text style={[styles.buttonText, {color: '#333'}]}>Cancelar</Text>
           </Pressable>
