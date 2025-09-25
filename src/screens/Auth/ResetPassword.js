@@ -1,0 +1,107 @@
+import React from 'react';
+import { View, Text } from 'react-native';
+import { supabase } from '../../api/Supabase';
+import AuthLayout from '../../components/AuthLayout';
+import { UnderlineInput, PrimaryButton, EyeToggle } from '../../components/FormBits.js';
+
+
+const passStrong = (p) => /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/.test(p);
+
+export default function ResetPassword({ navigation, route }) {
+  const { email } = route.params;
+
+  const [token, setToken] = React.useState('');
+
+  const [p1, setP1] = React.useState('');
+  const [p2, setP2] = React.useState('');
+
+  const [show1, setShow1] = React.useState(false);
+  const [show2, setShow2] = React.useState(false);
+
+  const [loading, setLoading] = React.useState(false);
+
+  const [msg, setMsg] = React.useState('');
+  const [err, setErr] = React.useState('');
+
+  const change = async () => {
+    setMsg('');
+    setErr('');
+    if (!token) { setErr('Ingresa el código que recibiste.'); return; }
+    if (!p1 || !p2) { setErr('Llena ambas contraseñas.'); return; }
+    if (p1 !== p2) { setErr('Las contraseñas no coinciden.'); return; }
+    if (!passStrong(p1)) {
+      setErr('Contraseña débil. Debe tener 8+ caracteres, una mayúscula, una minúscula y un número.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const { error: otpError } = await supabase.auth.verifyOtp({
+        email: email,
+        token: token,
+        type: 'recovery',
+      });
+
+      if (otpError) throw otpError;
+      const { error: updateError } = await supabase.auth.updateUser({ password: p1 });
+      
+      if (updateError) throw updateError;
+      
+      setMsg('Contraseña actualizada con éxito. Redirigiendo...');
+
+    } catch (e) {
+      setErr('Código inválido o expirado.');
+      console.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthLayout
+      activeTab="login"
+      onTabChange={(t) =>
+        navigation.replace(t === 'login' ? 'SignIn' : 'SignUp')
+      }
+      title="Create new password"
+    >
+      <UnderlineInput
+        placeholder="Código de verificación"
+        keyboardType="number-pad"
+        value={token}
+        onChangeText={setToken}
+      />
+
+      <View style={{ position: 'relative' }}>
+        <UnderlineInput
+          placeholder="Nueva contraseña"
+          secureTextEntry={!show1}
+          value={p1}
+          onChangeText={setP1}
+          style={{ paddingRight: 44 }}
+        />
+        <EyeToggle shown={show1} onToggle={() => setShow1(s => !s)} />
+      </View>
+
+      <View style={{ position: 'relative' }}>
+        <UnderlineInput
+          placeholder="Repite contraseña"
+          secureTextEntry={!show2}
+          value={p2}
+          onChangeText={setP2}
+          style={{ paddingRight: 44, marginBottom: 6 }}
+        />
+        <EyeToggle shown={show2} onToggle={() => setShow2(s => !s)} />
+      </View>
+
+      {err ? <Text style={{ color: 'red', textAlign: 'center', marginBottom: 6 }}>{err}</Text> : null}
+      {msg ? <Text style={{ color: 'green', textAlign: 'center', marginBottom: 6 }}>{msg}</Text> : null}
+
+      <PrimaryButton
+        title={loading ? '...' : 'ACTUALIZAR CONTRASEÑA'}
+        onPress={change}
+        disabled={loading}
+      />
+    </AuthLayout>
+  );
+}

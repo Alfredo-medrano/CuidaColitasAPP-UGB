@@ -5,10 +5,10 @@
     "scheme": "supabaseapp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Perrito_blanco.png",
+    "icon": "./src/assets/Perrito_blanco.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/welcome.png",
+      "image": "./src/assets/welcome.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Bacuna.png",
+        "foregroundImage": "./src/assets/Bacuna.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -28,7 +28,7 @@
       "package": "com.pyas.Supabase"
     },
     "web": {
-      "favicon": "./assets/banner.png"
+      "favicon": "./src/assets/banner.png"
     },
     "extra": {
       "supabaseUrl": "https://jjmvosegifrtbwlstzrb.supabase.co",
