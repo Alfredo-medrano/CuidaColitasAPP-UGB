@@ -44,7 +44,7 @@ Sigue estos pasos para clonar y ejecutar el proyecto en tu entorno de desarrollo
 Asegúrate de tener instalado lo siguiente en tu sistema:
 * [Node.js](https://nodejs.org/) (versión LTS recomendada)
 * [Git](https://git-scm.com/)
-* [Yarn](https://yarnpkg.com/) o npm (incluido con Node.js)
+* npm incluido en node
 * Tener una cuenta en [Supabase](https://supabase.com/) para crear tu propio proyecto de backend.
 
 ### Instalación
