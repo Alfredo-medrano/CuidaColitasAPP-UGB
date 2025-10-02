@@ -30,7 +30,6 @@ export default function ReprogramarCita({ navigation, route }) {
 
         try {
             setLoading(true);
-            // CORRECCIÓN: Traemos vet_id y el nombre del veterinario en una sola consulta
             const { data, error } = await supabase
                 .from('appointments')
                 .select(`
@@ -85,11 +84,10 @@ export default function ReprogramarCita({ navigation, route }) {
             const startOfAppointment = moment(newAppointmentTime).toDate();
             const endOfAppointment = moment(newAppointmentTime).add(30, 'minutes').toDate();
             
-            // CORRECCIÓN: Usamos appointment.vet_id para la verificación de disponibilidad
             const { data: existingAppointments, error: availabilityError } = await supabase
                 .from('appointments')
                 .select('id')
-                .eq('vet_id', appointment.vet_id) // Uso directo de vet_id de la tabla appointments
+                .eq('vet_id', appointment.vet_id) 
                 .gte('appointment_time', startOfAppointment.toISOString())
                 .lt('appointment_time', endOfAppointment.toISOString())
                 .neq('id', appointment.id);
@@ -105,7 +103,7 @@ export default function ReprogramarCita({ navigation, route }) {
                 .select('id')
                 .eq('status', 'Programada')
                 .single();
-            if (statusError || !statusData) { // Agregamos validación
+            if (statusError || !statusData) { 
                 throw new Error('No se encontró el estado "Programada" en la base de datos.');
             }
 
