@@ -16,5 +16,5 @@ const InfoCard = ({ title, children }) => (
     {children}
   </View>
 );
-// Los estilos completos se encuentran en el archivo principal a continuación.
+
 export default InfoCard;

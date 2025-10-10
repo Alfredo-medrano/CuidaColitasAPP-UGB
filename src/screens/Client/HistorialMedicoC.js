@@ -1,68 +1,84 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/FontAwesome5';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-import TabVisitas from './../Vet/TabVisitas';
-import TabVacunas from './../VetTabVacunas';
-import TabMedicamentos from './../Vet/TabMedicamentos';
-import TabArchivos from './../Vet/TabArchivos';
+import ClientTabVisitas from './ClientTabVisitas';
+import ClientTabVacunas from './ClientTabVacunas';
+import ClientTabMedicamentos from './ClientTabMedicamentos';
+import ClientTabArchivos from './ClientTabArchivos';
 
-export default function HistorialMedico({ route, navigation }) {
-  const { petId, petName, ownerName, userRole } = route.params;
-  const [activeTab, setActiveTab] = useState('Visitas');
+const TABS = ['Visitas', 'Vacunas', 'Medicamentos', 'Archivos'];
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'Visitas':
-        return <TabVisitas petId={petId} userRole={userRole} navigation={navigation} />;
-      case 'Vacunas':
-        return <TabVacunas petId={petId} userRole={userRole} navigation={navigation} />;
-      case 'Medicamentos':
-        return <TabMedicamentos petId={petId} userRole={userRole} navigation={navigation} />;
-      case 'Archivos':
-        return <TabArchivos petId={petId} userRole={userRole} navigation={navigation} />;
-      default:
-        return null;
-    }
-  };
+export default function HistorialMedicoC({ route, navigation }) {
+    const { petId, petName, petSpecies } = route.params; 
+    const [activeTab, setActiveTab] = useState('Visitas');
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}><Icon name="arrow-left" size={20} color="#fff" /></Pressable>
-        <View style={styles.titleContainer}>
-          <Text style={styles.headerTitle}>{petName}</Text>
-          <Text style={styles.headerSubtitle}>Dueño: {ownerName}</Text>
-        </View>
-        <View style={{ width: 20 }} />
-      </View>
-      
-      <View style={styles.tabContainer}>
-        {['Visitas', 'Vacunas', 'Medicamentos', 'Archivos'].map(tab => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.tab, activeTab === tab && styles.activeTab]}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
-          </Pressable>
-        ))}
-      </View>
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'Visitas': return <ClientTabVisitas petId={petId} />;
+            case 'Vacunas': return <ClientTabVacunas petId={petId} />;
+            case 'Medicamentos': return <ClientTabMedicamentos petId={petId} />;
+            case 'Archivos': return <ClientTabArchivos petId={petId} />;
+            default: return null;
+        }
+    };
 
-      <View style={styles.content}>
-        {renderContent()}
-      </View>
-    </SafeAreaView>
-  );
+    return (
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+            
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+                    <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+                <View>
+                    <Text style={styles.headerTitle}>Historial Médico</Text>
+                    <Text style={styles.headerSubtitle}>{petName} - {petSpecies}</Text>
+                </View>
+                <View style={styles.headerButton} />
+            </View>
+            
+            <View style={styles.tabContainer}>
+                {TABS.map(tab => (
+                    <TouchableOpacity 
+                        key={tab} 
+                        onPress={() => setActiveTab(tab)} 
+                        style={[styles.tab, activeTab === tab && styles.activeTab]}
+                    >
+                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            <View style={styles.content}>
+                {renderContent()}
+            </View>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#013847' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, paddingHorizontal: 20 },
-  titleContainer: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center' },
-  headerSubtitle: { fontSize: 16, color: '#d3d3d3', textAlign: 'center' },
-  tabContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#013847', paddingHorizontal: 15, paddingBottom: 10 },
-  tab: { paddingVertical: 10, paddingHorizontal: 15, borderRadius: 20 },
-  activeTab: { backgroundColor: '#43C0AF' },
-  tabText: { color: '#fff', fontWeight: 'bold' },
-  activeTabText: { color: '#013847' },
-  content: { flex: 1, backgroundColor: '#E2ECED', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 10 },
+    container: { 
+        flex: 1, 
+        backgroundColor: COLORS.primary 
+    },
+    header: { 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+    },
+
+    headerButton: { width: 30 },
+    headerTitle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.h2, color: COLORS.textPrimary, textAlign: 'center' },
+    headerSubtitle: { fontFamily: FONTS.PoppinsRegular, fontSize: 16, color: COLORS.secondary, textAlign: 'center' },
+    tabContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: COLORS.primary, borderBottomWidth: 1, borderBottomColor: COLORS.card },
+    tab: { paddingVertical: 15, alignItems: 'center', flex: 1 },
+    activeTab: { borderBottomWidth: 3, borderBottomColor: COLORS.accent },
+    tabText: { fontFamily: FONTS.PoppinsRegular, color: COLORS.secondary, fontSize: 15 },
+    activeTabText: { fontFamily: FONTS.PoppinsSemiBold, color: COLORS.textPrimary },
+    content: { flex: 1, backgroundColor: COLORS.secondary },
 });

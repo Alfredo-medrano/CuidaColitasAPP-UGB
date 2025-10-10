@@ -1,15 +1,22 @@
 // src/screens/Client/EditProfileClient.js
 
 import React, { useState, useEffect } from 'react';
-import { 
-    View, Text, StyleSheet, ScrollView, TextInput, Alert, 
-    ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform 
+import {
+    View, Text, StyleSheet, ScrollView, TextInput, Alert,
+    ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform,
+    Dimensions
 } from 'react-native';
 import { supabase } from '../../api/Supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+
+// --- UTILIDAD PARA TAMAÑOS RESPONSIVOS ---
+const { width } = Dimensions.get('window');
+const guidelineBaseWidth = 375;
+
+const responsiveSize = (size) => (width / guidelineBaseWidth) * size;
 
 // --- COMPONENTES INTERNOS ---
 
@@ -33,7 +40,7 @@ const PrimaryButton = ({ title, onPress, disabled, loading, icon }) => (
             <ActivityIndicator color={COLORS.primary} />
         ) : (
             <>
-                <Ionicons name={icon} size={20} color={COLORS.primary} />
+                <Ionicons name={icon} size={responsiveSize(20)} color={COLORS.primary} />
                 <Text style={[styles.buttonText, styles.primaryButtonText]}>{title}</Text>
             </>
         )}
@@ -42,8 +49,8 @@ const PrimaryButton = ({ title, onPress, disabled, loading, icon }) => (
 
 const SecondaryButton = ({ title, onPress, disabled, icon, color = COLORS.primary }) => (
     <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={onPress} disabled={disabled}>
-        <Ionicons name={icon} size={20} color={color} />
-        <Text style={[styles.buttonText, styles.secondaryButtonText, {color: color}]}>{title}</Text>
+        <Ionicons name={icon} size={responsiveSize(20)} color={color} />
+        <Text style={[styles.buttonText, styles.secondaryButtonText, { color: color }]}>{title}</Text>
     </TouchableOpacity>
 );
 
@@ -51,10 +58,8 @@ const SecondaryButton = ({ title, onPress, disabled, icon, color = COLORS.primar
 
 export default function EditProfileClient({ route, navigation }) {
     const { profile: initialProfile } = route.params;
-
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
-
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [address, setAddress] = useState('');
@@ -121,7 +126,6 @@ export default function EditProfileClient({ route, navigation }) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("No hay un usuario logueado.");
 
-            // ----- CORRECCIÓN AQUÍ -----
             const updates = {
                 id: user.id,
                 name: name.trim(),
@@ -130,7 +134,7 @@ export default function EditProfileClient({ route, navigation }) {
                 emergency_name: emergencyName,
                 emergency_phone: emergencyPhone,
                 avatar_url: avatarUrl,
-                role_id: initialProfile.role_id, // Se asegura de que el role_id no se pierda
+                role_id: initialProfile.role_id,
                 updated_at: new Date(),
             };
 
@@ -147,91 +151,97 @@ export default function EditProfileClient({ route, navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={[]}>
-            <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Editar Perfil</Text>
-                <View style={styles.headerButton} /> 
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.avatarSection}>
-                    <TouchableOpacity onPress={pickImage} disabled={uploading}>
-                        <Image 
-                            source={avatarUrl ? { uri: avatarUrl } : require('../../assets/Perrito_blanco.png')}
-                            style={styles.avatar} 
-                        />
-                        {uploading && (
-                            <View style={styles.avatarOverlay}>
-                                <ActivityIndicator color={COLORS.white} />
-                            </View>
-                        )}
+        <View style={styles.rootContainer}>
+            <SafeAreaView style={styles.safeContainer}>
+                <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+                        <Ionicons name="arrow-back" size={responsiveSize(24)} color={COLORS.textPrimary} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage} disabled={uploading}>
-                        <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
-                        <Text style={styles.changePhotoButtonText}>Cambiar Foto</Text>
-                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Editar Perfil</Text>
+                    <View style={styles.headerButton} />
                 </View>
 
-                <View style={styles.formSection}>
-                    <Text style={styles.sectionTitle}>Información Personal</Text>
-                    <FormInput label="Nombre(s) y Apellido(s)" value={name} onChangeText={setName} placeholder="Tu nombre completo" />
-                    <FormInput label="Email" value={initialProfile?.email || ''} editable={false} />
-                    <FormInput label="Teléfono" value={phone} onChangeText={setPhone} placeholder="Tu número de teléfono" keyboardType="phone-pad" />
-                    <FormInput label="Dirección" value={address} onChangeText={setAddress} placeholder="Tu dirección" />
-                </View>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    <View style={styles.avatarSection}>
+                        <TouchableOpacity onPress={pickImage} disabled={uploading}>
+                            <Image
+                                source={avatarUrl ? { uri: avatarUrl } : require('../../assets/Perrito_blanco.png')}
+                                style={styles.avatar}
+                            />
+                            {uploading && (
+                                <View style={styles.avatarOverlay}>
+                                    <ActivityIndicator color={COLORS.white} />
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage} disabled={uploading}>
+                            <Ionicons name="camera-outline" size={responsiveSize(20)} color={COLORS.primary} />
+                            <Text style={styles.changePhotoButtonText}>Cambiar Foto</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                <View style={styles.formSection}>
-                    <Text style={styles.sectionTitle}>Contacto de Emergencia</Text>
-                    <FormInput label="Nombre del Contacto" value={emergencyName} onChangeText={setEmergencyName} placeholder="Nombre completo" />
-                    <FormInput label="Teléfono del Contacto" value={emergencyPhone} onChangeText={setEmergencyPhone} placeholder="Número de teléfono" keyboardType="phone-pad" />
-                </View>
+                    <View style={styles.formSection}>
+                        <Text style={styles.sectionTitle}>Información Personal</Text>
+                        <FormInput label="Nombre(s) y Apellido(s)" value={name} onChangeText={setName} placeholder="Tu nombre completo" />
+                        <FormInput label="Email" value={initialProfile?.email || ''} editable={false} />
+                        <FormInput label="Teléfono" value={phone} onChangeText={setPhone} placeholder="Tu número de teléfono" keyboardType="phone-pad" />
+                        <FormInput label="Dirección" value={address} onChangeText={setAddress} placeholder="Tu dirección" />
+                    </View>
 
-                <View style={styles.actionButtons}>
-                    <SecondaryButton title="Cancelar" onPress={() => navigation.goBack()} icon="close-outline" color={COLORS.secondary}/>
-                    <PrimaryButton title="Guardar" onPress={handleSave} disabled={saving || uploading} loading={saving} icon="save-outline" />
-                </View>
-            </ScrollView>
-        </SafeAreaView>
+                    <View style={styles.formSection}>
+                        <Text style={styles.sectionTitle}>Contacto de Emergencia</Text>
+                        <FormInput label="Nombre del Contacto" value={emergencyName} onChangeText={setEmergencyName} placeholder="Nombre completo" />
+                        <FormInput label="Teléfono del Contacto" value={emergencyPhone} onChangeText={setEmergencyPhone} placeholder="Número de teléfono" keyboardType="phone-pad" />
+                    </View>
+
+                    <View style={styles.actionButtons}>
+                        <SecondaryButton title="Cancelar" onPress={() => navigation.goBack()} icon="close-outline" color={COLORS.secondary} />
+                        <PrimaryButton title="Guardar" onPress={handleSave} disabled={saving || uploading} loading={saving} icon="save-outline" />
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    rootContainer: {
         flex: 1,
         backgroundColor: COLORS.primary,
+    },
+    safeContainer: {
+        flex: 1,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'android' ? 20 : 10,
-        paddingBottom: 15,
+        paddingHorizontal: responsiveSize(20),
+        paddingTop: Platform.OS === 'android' ? responsiveSize(20) : responsiveSize(10),
+        paddingBottom: responsiveSize(15),
+        backgroundColor: COLORS.primary,
     },
     headerButton: {
-        width: 30,
+        width: responsiveSize(30),
     },
     headerTitle: {
         fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.h2,
+        fontSize: responsiveSize(22),
         color: COLORS.textPrimary,
     },
     scrollContent: {
-        paddingBottom: 40,
+        paddingBottom: responsiveSize(40),
         backgroundColor: COLORS.primary,
     },
     avatarSection: {
         alignItems: 'center',
-        marginVertical: 20,
+        marginVertical: responsiveSize(20),
     },
     avatar: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: responsiveSize(120),
+        height: responsiveSize(120),
+        borderRadius: responsiveSize(60),
         backgroundColor: COLORS.secondary,
     },
     avatarOverlay: {
@@ -239,70 +249,71 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.4)',
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 60,
+        borderRadius: responsiveSize(60),
     },
     changePhotoButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.secondary,
         borderRadius: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 15,
-        marginTop: 15,
+        paddingVertical: responsiveSize(8),
+        paddingHorizontal: responsiveSize(15),
+        marginTop: responsiveSize(15),
     },
     changePhotoButtonText: {
         fontFamily: FONTS.PoppinsSemiBold,
         color: COLORS.primary,
         marginLeft: 8,
+        fontSize: responsiveSize(14),
     },
     formSection: {
         backgroundColor: COLORS.card,
         borderRadius: 16,
-        padding: 20,
-        marginHorizontal: 20,
-        marginBottom: 15,
+        padding: responsiveSize(20),
+        marginHorizontal: responsiveSize(20),
+        marginBottom: responsiveSize(15),
     },
     sectionTitle: {
         fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.h3,
+        fontSize: responsiveSize(18),
         color: COLORS.textPrimary,
-        marginBottom: 15,
+        marginBottom: responsiveSize(15),
     },
     inputGroup: {
-        marginBottom: 15,
+        marginBottom: responsiveSize(15),
     },
     inputLabel: {
         fontFamily: FONTS.PoppinsRegular,
-        fontSize: 14,
+        fontSize: responsiveSize(14),
         color: COLORS.secondary,
         marginBottom: 8,
     },
     input: {
         backgroundColor: COLORS.secondary,
         borderRadius: 10,
-        paddingHorizontal: 15,
-        paddingVertical: 12,
+        paddingHorizontal: responsiveSize(15),
+        paddingVertical: responsiveSize(12),
         fontFamily: FONTS.PoppinsRegular,
-        fontSize: 16,
+        fontSize: responsiveSize(16),
         color: COLORS.primary,
     },
     actionButtons: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginHorizontal: 20,
-        marginTop: 20,
+        marginHorizontal: responsiveSize(20),
+        marginTop: responsiveSize(20),
     },
     button: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 15,
+        paddingVertical: responsiveSize(15),
         borderRadius: 12,
         flex: 1,
     },
     primaryButton: {
         backgroundColor: COLORS.accent,
-        marginLeft: 10,
+        marginLeft: responsiveSize(10),
     },
     secondaryButton: {
         backgroundColor: 'transparent',
@@ -311,7 +322,7 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         fontFamily: FONTS.PoppinsBold,
-        fontSize: 16,
+        fontSize: responsiveSize(16),
         marginLeft: 10,
     },
     primaryButtonText: {

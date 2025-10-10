@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert, ScrollView, ActivityIndicator, TouchableOpacity, StatusBar } from 'react-native';
 import { supabase } from '../api/Supabase';
 import { useIsFocused } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/FontAwesome5';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import moment from 'moment';
 import 'moment/locale/es';
+import { COLORS, FONTS, SIZES } from '../theme/theme';
 
 moment.locale('es');
+
+const InfoRow = ({ icon, label, value }) => (
+    <View style={styles.infoRow}>
+        <Ionicons name={icon} size={20} color={COLORS.primary} style={styles.infoIcon} />
+        <View>
+            <Text style={styles.infoLabel}>{label}</Text>
+            <Text style={styles.infoValue}>{value}</Text>
+        </View>
+    </View>
+);
 
 export default function DetalleCita({ navigation, route }) {
     const { appointmentId, userRole } = route.params;
@@ -21,20 +32,11 @@ export default function DetalleCita({ navigation, route }) {
             setLoading(false);
             return;
         }
-
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('appointments')
-                .select(`
-                    id,
-                    appointment_time,
-                    reason,
-                    pet:pets ( name ),
-                    client:profiles!client_id ( name ),
-                    vet:profiles!vet_id ( name ),
-                    status:appointment_status ( status )
-                `)
+                .select(`id, appointment_time, reason, pet:pets(name), client:profiles!client_id(id, name), vet:profiles!vet_id(id, name), status:appointment_status(status)`)
                 .eq('id', appointmentId)
                 .single();
             
@@ -42,7 +44,6 @@ export default function DetalleCita({ navigation, route }) {
             setAppointment(data);
         } catch (error) {
             Alert.alert("Error", "No se pudo cargar el detalle de la cita.");
-            console.error("Error al cargar cita:", error.message);
         } finally {
             setLoading(false);
         }
@@ -66,26 +67,28 @@ export default function DetalleCita({ navigation, route }) {
                     onPress: async () => {
                         setLoading(true);
                         try {
-                            const { data: statusData, error: statusError } = await supabase
-                                .from('appointment_status')
-                                .select('id')
-                                .eq('status', 'Cancelada')
-                                .single();
-                            
+                            const { data: statusData, error: statusError } = await supabase.from('appointment_status').select('id').eq('status', 'Cancelada').single();
                             if (statusError) throw statusError;
 
-                            const { error: updateError } = await supabase
-                                .from('appointments')
-                                .update({ status_id: statusData.id })
-                                .eq('id', appointmentId);
-
+                            const { error: updateError } = await supabase.from('appointments').update({ status_id: statusData.id }).eq('id', appointmentId);
                             if (updateError) throw updateError;
+                            
+                            const currentUserIsClient = userRole === 'cliente';
+                            const recipientId = currentUserIsClient ? appointment.vet.id : appointment.client.id;
+                            const cancelledBy = currentUserIsClient ? 'El cliente' : 'El veterinario';
+
+                            await supabase.from('notifications').insert({
+                                user_id: recipientId,
+                                type: 'appointment_reminder', // Se puede crear un tipo 'appointment_cancelled'
+                                title: `Cita para ${appointment.pet.name} cancelada`,
+                                content: `${cancelledBy} ha cancelado la cita del ${moment(appointment.appointment_time).format('LLL')}.`,
+                                link_id: appointment.id
+                            });
                             
                             Alert.alert("Éxito", "La cita ha sido cancelada.");
                             navigation.goBack(); 
                         } catch (error) {
                             Alert.alert("Error", "No se pudo cancelar la cita. Intenta de nuevo.");
-                            console.error("Error al cancelar:", error.message);
                         } finally {
                             setLoading(false);
                         }
@@ -95,66 +98,45 @@ export default function DetalleCita({ navigation, route }) {
         );
     };
 
-    const handleReschedule = () => {
-        if (appointment && appointment.id) {
-            navigation.navigate('ReprogramarCita', { appointmentId: appointment.id });
-        } else {
-            Alert.alert("Error", "No se puede reprogramar. Inténtalo de nuevo.");
-        }
-    };
-
     if (loading || !appointment) {
         return (
             <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#43C0AF" />
-                <Text style={styles.loadingText}>Cargando detalles de la cita...</Text>
+                <ActivityIndicator size="large" color={COLORS.accent} />
             </View>
         );
     }
     
-    const getStatusBadgeStyle = (status) => {
-        switch (status) {
-            case 'Confirmada': return { backgroundColor: '#d4edda', color: '#155724' };
-            case 'Pendiente':
-            case 'Programada': return { backgroundColor: '#fff3cd', color: '#856404' };
-            case 'Cancelada': return { backgroundColor: '#f8d7da', color: '#721c24' };
-            case 'Completada': return { backgroundColor: '#cce5ff', color: '#004085' };
-            default: return { backgroundColor: '#e9ecef', color: '#495057' };
-        }
+    const statusColors = {
+        'Confirmada': { bg: '#A8E6DC80', text: '#027A74' },
+        'Pendiente': { bg: '#FFF4CC', text: '#CDA37B' },
+        'Programada': { bg: '#FFF4CC', text: '#CDA37B' },
+        'Cancelada': { bg: '#FFD2D2', text: '#D32F2F' },
+        'Completada': { bg: '#D3E5FF', text: '#004085' },
     };
-
-    const statusStyle = getStatusBadgeStyle(appointment.status.status);
-    const isPastAppointment = moment(appointment.appointment_time).isBefore(moment());
-    const isCancellable = !isPastAppointment && appointment.status.status !== 'Cancelada';
+    const statusStyle = statusColors[appointment.status.status] || { bg: 'grey', text: 'white' };
+    const isCancellable = !moment(appointment.appointment_time).isBefore(moment()) && appointment.status.status !== 'Cancelada' && appointment.status.status !== 'Completada';
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
             <View style={styles.header}>
-                <Pressable onPress={() => navigation.goBack()}><Icon name="arrow-left" size={20} color="#fff" /></Pressable>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+                    <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Detalle de Cita</Text>
-                <View style={{ width: 20 }} />
+                <View style={styles.headerButton} />
             </View>
 
-            <ScrollView style={styles.content}>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <Text style={styles.petName}>{appointment.pet.name}</Text>
-                        <View style={[styles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
-                            <Text style={[styles.statusText, { color: statusStyle.color }]}>{appointment.status.status}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                            <Text style={[styles.statusText, { color: statusStyle.text }]}>{appointment.status.status}</Text>
                         </View>
                     </View>
-                    <View style={styles.infoRow}>
-                        <Icon name="calendar-alt" size={16} color="#666" style={styles.iconMargin} />
-                        <Text style={styles.infoText}>{moment(appointment.appointment_time).format('dddd, D [de] MMMM [a las] LT')}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Icon name="user-md" size={16} color="#666" style={styles.iconMargin} />
-                        <Text style={styles.infoText}>Veterinario: {appointment.vet.name}</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Icon name="user" size={16} color="#666" style={styles.iconMargin} />
-                        <Text style={styles.infoText}>Cliente: {appointment.client.name}</Text>
-                    </View>
+                    <InfoRow icon="calendar-outline" label="Fecha y Hora" value={moment(appointment.appointment_time).format('dddd, D [de] MMMM [a las] HH:mm A')} />
+                    <InfoRow icon="person-outline" label={userRole === 'cliente' ? 'Veterinario' : 'Cliente'} value={userRole === 'cliente' ? appointment.vet.name : appointment.client.name} />
                 </View>
 
                 <View style={styles.card}>
@@ -164,17 +146,16 @@ export default function DetalleCita({ navigation, route }) {
 
                 {isCancellable && (
                     <View style={styles.actionButtons}>
-                        {/* BOTÓN REPROGRAMAR - SÓLO VISIBLE SI LA CITA ESTÁ CARGADA */}
-                        {appointment && appointment.id && (
-                            <Pressable style={styles.rescheduleButton} onPress={handleReschedule}>
-                                <Icon name="redo" size={16} color="#fff" style={styles.iconMargin} />
-                                <Text style={styles.buttonText}>Reprogramar</Text>
-                            </Pressable>
+                        {userRole === 'veterinario' && (
+                            <TouchableOpacity style={styles.rescheduleButton} onPress={() => navigation.navigate('ReprogramarCita', { appointmentId: appointment.id })}>
+                                <Ionicons name="repeat-outline" size={20} color={COLORS.primary} />
+                                <Text style={styles.rescheduleButtonText}>Reprogramar</Text>
+                            </TouchableOpacity>
                         )}
-                        <Pressable style={styles.cancelButton} onPress={handleCancelAppointment}>
-                            <Icon name="times" size={16} color="#fff" style={styles.iconMargin} />
-                            <Text style={styles.buttonText}>Cancelar Cita</Text>
-                        </Pressable>
+                        <TouchableOpacity style={styles.cancelButton} onPress={handleCancelAppointment}>
+                            <Ionicons name="close-circle-outline" size={20} color={COLORS.white} />
+                            <Text style={styles.cancelButtonText}>Cancelar Cita</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             </ScrollView>
@@ -183,26 +164,26 @@ export default function DetalleCita({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#013847' },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#E2ECED' },
-    loadingText: { color: '#013847', marginTop: 15 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15 },
-    headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-    content: { flex: 1, backgroundColor: '#E2ECED', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
-    card: { backgroundColor: '#fff', borderRadius: 12, padding: 20, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5 },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-    cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#013847' },
-    petName: { fontSize: 20, fontWeight: 'bold', color: '#013847' },
-    statusBadge: { borderRadius: 12, paddingVertical: 4, paddingHorizontal: 10 },
-    statusText: { fontSize: 12, fontWeight: 'bold' },
-    infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    infoText: { fontSize: 16, color: '#333' },
-    iconMargin: { marginRight: 10 },
-    reasonText: { fontSize: 16, color: '#555', lineHeight: 24 },
-    actionButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, gap: 10 },
-    button: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderRadius: 12 },
-    rescheduleButton: { backgroundColor: '#DAA520' },
-    cancelButton: { backgroundColor: '#dc3545' },
-    confirmButton: { backgroundColor: '#28a745' },
-    buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    container: { flex: 1, backgroundColor: COLORS.primary },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.primary },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 },
+    headerButton: { width: 30 },
+    headerTitle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.h2, color: COLORS.textPrimary },
+    scrollContent: { padding: 20, paddingBottom: 40 },
+    card: { backgroundColor: COLORS.secondary, borderRadius: 16, padding: 20, marginBottom: 15 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: `${COLORS.primary}20`, paddingBottom: 15 },
+    petName: { fontFamily: FONTS.PoppinsBold, fontSize: 22, color: COLORS.primary },
+    statusBadge: { borderRadius: 12, paddingVertical: 5, paddingHorizontal: 12 },
+    statusText: { fontFamily: FONTS.PoppinsBold, fontSize: 12 },
+    cardTitle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.h3, color: COLORS.primary, marginBottom: 10 },
+    infoRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 15 },
+    infoIcon: { marginRight: 15, marginTop: 2 },
+    infoLabel: { fontFamily: FONTS.PoppinsRegular, fontSize: 14, color: COLORS.card, marginBottom: 2 },
+    infoValue: { fontFamily: FONTS.PoppinsSemiBold, fontSize: 16, color: COLORS.primary, flex: 1 },
+    reasonText: { fontFamily: FONTS.PoppinsRegular, fontSize: 16, color: COLORS.primary, lineHeight: 24 },
+    actionButtons: { marginTop: 20, gap: 15 },
+    rescheduleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderRadius: 12, backgroundColor: COLORS.secondary, borderWidth: 1, borderColor: COLORS.accent },
+    rescheduleButtonText: { fontFamily: FONTS.PoppinsBold, color: COLORS.primary, fontSize: 16, marginLeft: 10 },
+    cancelButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderRadius: 12, backgroundColor: '#D32F2F' },
+    cancelButtonText: { fontFamily: FONTS.PoppinsBold, color: COLORS.white, fontSize: 16, marginLeft: 10 },
 });

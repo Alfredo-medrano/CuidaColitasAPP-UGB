@@ -5,8 +5,6 @@ import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import 'moment/locale/es';
-
-// Importaciones de nuestros nuevos componentes y tema
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import HomeHeader from '../../components/client/HomeHeader';
 import NotificationCard from '../../components/client/NotificationCard';
@@ -14,7 +12,6 @@ import ActionButton from '../../components/client/ActionButton';
 
 moment.locale('es');
 
-// Lista de acciones rápidas para mejor mantenibilidad
 const quickActions = [
   { id: '1', icon: 'paw-outline', label: 'Mis Mascotas', screen: 'MisMascotas' },
   { id: '2', icon: 'calendar-outline', label: 'Mis Citas', screen: 'MisCitas' },
@@ -29,13 +26,11 @@ export default function ClienteHome({ navigation }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const isFocused = useIsFocused();
 
-  // Función para obtener todos los datos de la pantalla
   const fetchScreenData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado.');
 
-      // Usamos Promise.all para ejecutar las consultas en paralelo y mejorar el rendimiento
       const [profileResponse, notificationsResponse, unreadCountResponse] = await Promise.all([
         supabase.from('profiles').select(`name, avatar_url`).eq('id', user.id).single(),
         supabase.from('notifications').select(`*`).eq('user_id', user.id).order('created_at', { ascending: false }).limit(3),
@@ -57,10 +52,9 @@ export default function ClienteHome({ navigation }) {
     }
   }, []);
 
-  // useEffect se activa cada vez que la pantalla obtiene el foco
   useEffect(() => {
     if (isFocused) {
-      setLoading(true); // Muestra el loader al recargar
+      setLoading(true); 
       fetchScreenData();
     }
   }, [isFocused, fetchScreenData]);
@@ -125,7 +119,6 @@ export default function ClienteHome({ navigation }) {
   );
 }
 
-// --- ESTILOS UNIFICADOS ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -176,7 +169,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  // --- HomeHeader Styles ---
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -230,7 +222,6 @@ const styles = StyleSheet.create({
       fontFamily: FONTS.PoppinsBold,
       fontSize: 12,
   },
-  // --- NotificationCard Styles ---
   notificationCard: {
     backgroundColor: COLORS.card,
     borderRadius: 12,
@@ -274,7 +265,6 @@ const styles = StyleSheet.create({
       backgroundColor: COLORS.accent,
       marginLeft: 10,
   },
-  // --- ActionButton Styles ---
   actionButton: {
     width: '48%',
     backgroundColor: COLORS.card,
@@ -283,7 +273,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    aspectRatio: 1, // Para que sean cuadrados
+    aspectRatio: 1,
   },
   actionButtonLabel: {
     fontFamily: FONTS.PoppinsSemiBold,

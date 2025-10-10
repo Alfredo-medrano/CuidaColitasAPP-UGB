@@ -9,15 +9,11 @@ export default function Home({ navigation }) {
 
   const fetchUserAndRedirect = async () => {
     try {
-      // 1. Verificar si hay un usuario logueado
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        // Si no hay usuario, la navegación condicional en App.js lo maneja.
-        // Solo salimos de esta función.
         return;
       }
 
-      // 2. Obtener el rol del usuario desde la base de datos
       const { data, error } = await supabase
         .from('profiles') 
         .select('role:roles ( name )') 
@@ -28,7 +24,6 @@ export default function Home({ navigation }) {
       
       const role = data?.role?.name;
 
-      // 3. Redirigir según el rol
       if (role === 'veterinario') {
         navigation.replace('VeterinarioHome');
       } else if (role === 'cliente') {
@@ -43,13 +38,11 @@ export default function Home({ navigation }) {
       Alert.alert("Error de Redirección", "No pudimos verificar tu rol. Saliendo de la sesión.");
       await supabase.auth.signOut();
     } finally {
-        // Este bloque se ejecuta siempre, asegurando que el loading se detenga.
         setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Solo ejecutamos la lógica de redirección cuando la pantalla está enfocada.
     if (isFocused) {
         fetchUserAndRedirect();
     }
@@ -70,7 +63,6 @@ export default function Home({ navigation }) {
     );
   }
 
-  // Si no está cargando y no se ha redirigido, se muestra un fallback
   return (
     <View style={styles.container}>
         <Text>Error de carga o redirección</Text>

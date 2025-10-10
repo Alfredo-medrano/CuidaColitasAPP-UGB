@@ -8,8 +8,7 @@ export const COLORS = {
   white: '#FFFFFF',
   black: '#000000',
   red: '#FF1744',            
-  
-  // Colores para fondos de íconos de notificación
+
   lightRed: 'rgba(255, 23, 68, 0.1)',
   lightBlue: 'rgba(67, 192, 175, 0.1)',
   lightGreen: 'rgba(29, 234, 155, 0.1)',
@@ -21,7 +20,6 @@ export const FONTS = {
   PoppinsBold: 'Poppins-Bold',
 };
 
-// Puedes añadir tamaños de fuente para consistencia
 export const SIZES = {
     h1: 28,
     h2: 22,

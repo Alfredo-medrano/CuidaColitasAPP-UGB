@@ -23,5 +23,5 @@ const ProfileHeader = ({ profile, onGoBack }) => (
     <View style={{ width: 24 }} />
   </View>
 );
-// Los estilos completos se encuentran en el archivo principal a continuación.
+
 export default ProfileHeader;
