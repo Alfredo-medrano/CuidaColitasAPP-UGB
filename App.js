@@ -1,11 +1,17 @@
+// App.js
+
 import 'react-native-url-polyfill/auto';
-import React, {useEffect, useState } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
-import { supabase } from './src/api/Supabase';
 import { useFonts } from 'expo-font';
 import { COLORS } from './src/theme/theme';
+
+// --- NUESTRAS IMPORTACIONES ---
+import { AuthProvider, useAuth } from './src/context/AuthContext'; 
+
+// Importa todas tus pantallas como ya lo tenías
 import SignIn from './src/screens/Auth/Signin';
 import SignUp from './src/screens/Auth/signup';
 import ForgotPassword from './src/screens/Auth/ForgotPassword';
@@ -33,12 +39,11 @@ import SolicitarCita from './src/screens/Client/SolicitarCita';
 import ReprogramarCita from './src/screens/Client/ReprogramarCita';
 import MisMascotas from './src/screens/Client/MisMascotas';
 import HistorialMedicoC from './src/screens/Client/HistorialMedicoC';
-
 import DetalleCita from './src/components/DetalleCita';
 
 const Stack = createNativeStackNavigator();
 
--
+// --- Pilas de navegación (sin cambios) ---
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -51,11 +56,12 @@ function AuthStack() {
 }
 
 function AppStack() {
+  // Aquí podrías usar el hook useAuth() para obtener el rol del perfil
+  // y decidir qué pantalla mostrar primero si fuera necesario.
   return (
     <Stack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
-
       <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
-
+      {/* ...el resto de tus pantallas de la app... */}
       <Stack.Screen name="ClienteHome" component={ClienteHome} options={{ headerShown: false }} />
       <Stack.Screen name="ProfileCliente" component={ProfileCliente} options={{ headerShown: false }}/>
       <Stack.Screen name="EditProfileClient" component={EditProfileClient} options={{ headerShown: false }} />
@@ -64,7 +70,6 @@ function AppStack() {
       <Stack.Screen name="MisCitas" component={MisCitas} options={{ title: 'Mis Citas' }} />
       <Stack.Screen name="SolicitarCita" component={SolicitarCita} options={{ title: 'Solicitar Cita' }} />
       <Stack.Screen name="ReprogramarCita" component={ReprogramarCita} options={{ title: 'Reprogramar Cita' }} />
-      
       <Stack.Screen name="VeterinarioHome" component={VeterinarioHome} options={{ headerShown: false }} />
       <Stack.Screen name="Profile" component={Profile} options={{ title: 'Mi Perfil', headerStyle: { backgroundColor: '#013847' }, headerTintColor: '#fff',}} />
       <Stack.Screen name="EditProfile" component={EditProfile} options={{ title: 'Editar Perfil',}} /> 
@@ -79,36 +84,19 @@ function AppStack() {
       <Stack.Screen name="NuevaVisita" component={NuevaVisita} options={{ title: 'Nueva Visita' }} />
       <Stack.Screen name="NuevaVacuna" component={NuevaVacuna} options={{ title: 'Nueva Vacuna' }} />
       <Stack.Screen name="NuevoMedicamento" component={NuevoMedicamento} options={{ title: 'Nuevo Medicamento' }} />
-      
       <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
     </Stack.Navigator>
   );
 }
 
-export default function App() {
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState(null);
-
+// --- Componente que decide qué navegación mostrar ---
+function RootNavigator() {
+  const { session, loading } = useAuth();
   const [fontsLoaded] = useFonts({
     'Poppins-Regular': require('./src/assets/fonts/Poppins-Regular.ttf'),
     'Poppins-SemiBold': require('./src/assets/fonts/Poppins-SemiBold.ttf'),
     'Poppins-Bold': require('./src/assets/fonts/Poppins-Bold.ttf'),
   });
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
 
   if (loading || !fontsLoaded) {
     return (
@@ -122,5 +110,14 @@ export default function App() {
     <NavigationContainer>
       {session && session.user ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
+  );
+}
+
+// --- Componente principal de la App ---
+export default function App() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
   );
 }

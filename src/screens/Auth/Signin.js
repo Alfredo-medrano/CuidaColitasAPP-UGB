@@ -1,3 +1,5 @@
+// src/screens/Auth/Signin.js
+
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { supabase } from '../../api/Supabase.js';
@@ -11,63 +13,41 @@ export default function SignIn({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Esta es la función que se ejecuta al presionar "LOG IN"
   const onSignIn = async () => {
     setError('');
     setLoading(true);
 
     try {
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
-        email,
+      // Intenta iniciar sesión con el email y la contraseña
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: email.trim(), // Usamos trim() para limpiar espacios en blanco
         password,
       });
 
+      // Si Supabase devuelve un error, lo mostramos
       if (loginError) {
         throw loginError;
       }
-
-      // Desestructuramos user de forma segura para evitar el error 'NONE'
-      const user = data?.user;
-      if (!user) {
-        throw new Error("Usuario o contraseña incorrectos.");
-      }
       
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          name,
-          roles ( name )
-        `)
-        .eq('id', user.id)
-        .single();
+      // Si el inicio de sesión es exitoso, nuestro AuthContext
+      // se encargará del resto automáticamente. No necesitamos hacer más nada aquí.
 
-      if (profileError) {
-        throw new Error("No se pudo obtener la información del perfil.");
-      }
-      
-      const userRole = profileData?.roles?.name;
-
-      if (userRole === 'veterinario' || userRole === 'cliente') {
-        navigation.replace('Home');
-      } else {
-        throw new Error("Rol de usuario no reconocido.");
-      }
     } catch (err) {
-      console.error('--- ERROR DETALLADO DE SUPABASE EN SIGNIN ---', err);
-      const authErrorMessages = {
-        'invalid login credentials': 'Email o contraseña incorrectos.',
-      };
-      
-      const errorMessage = err.message || 'Ocurrió un error inesperado.';
-      setError(authErrorMessages[errorMessage.toLowerCase()] || errorMessage);
+      // Muestra un mensaje de error amigable al usuario
+      console.error('Error al iniciar sesión:', err.message);
+      setError('Email o contraseña incorrectos. Intenta de nuevo.');
     } finally {
+      // Pase lo que pase, dejamos de mostrar el indicador de carga
       setLoading(false);
     }
   };
 
+  // Esta es la parte visual de la pantalla (la UI)
   return (
     <AuthLayout
       activeTab="login"
-      onTabChange={(t) => navigation.replace(t === 'login' ? 'SignIn' : 'SignUp', { prefillEmail: email.trim().toLowerCase() })}
+      onTabChange={() => navigation.replace('SignUp', { prefillEmail: email.trim().toLowerCase() })}
       title="Welcome to CuidaColitas"
     >
       <UnderlineInput
@@ -88,10 +68,13 @@ export default function SignIn({ navigation }) {
         <EyeToggle shown={show} onToggle={() => setShow(s => !s)} />
       </View>
 
+      {/* Muestra el mensaje de error si existe */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <PrimaryButton title={loading ? '...' : 'LOG IN'} onPress={onSignIn} disabled={loading} />
+      {/* Botón principal para iniciar sesión */}
+      <PrimaryButton title={loading ? 'Ingresando...' : 'LOG IN'} onPress={onSignIn} disabled={loading} />
 
+      {/* Texto para ir a la pantalla de recuperar contraseña */}
       <Text
         onPress={() => navigation.navigate('ForgotPassword', { prefillEmail: email.trim().toLowerCase() })}
         style={styles.switchText}
@@ -102,7 +85,8 @@ export default function SignIn({ navigation }) {
   );
 }
 
+// Estos son los estilos para los componentes de la pantalla
 const styles = StyleSheet.create({
-  errorText: { color: 'red', textAlign: 'center', marginBottom: 6 },
-  switchText: { textAlign: 'center', marginTop: 10, color: '#013847' },
+  errorText: { color: 'red', textAlign: 'center', marginBottom: 10, marginTop: 5 },
+  switchText: { textAlign: 'center', marginTop: 15, color: '#013847', fontWeight: '500' },
 });
