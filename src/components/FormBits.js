@@ -40,7 +40,7 @@ export function UnderlineInput(props) {
   return (
     <TextInput
       {...props}
-      placeholderTextColor={COLORS.accent} 
+      placeholderTextColor={COLORS.black + '70' } 
       style={[styles.input, props.style]}
     />
   );
