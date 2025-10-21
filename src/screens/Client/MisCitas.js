@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-    View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, 
-    TouchableOpacity, StatusBar 
-} from 'react-native';
-import { supabase } from '../../api/Supabase';
+// src/screens/Client/MisCitas.js
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, StatusBar } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,41 +9,55 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import moment from 'moment';
 import 'moment/locale/es';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+import { useAppointments } from '../../hooks/useAppointments'; 
 
-
+// Configuración del idioma del calendario a español
 LocaleConfig.locales['es'] = {
-  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
-  monthNamesShort: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  dayNamesShort: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
-  today: 'Hoy'
+    monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+    monthNamesShort: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+    dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+    dayNamesShort: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+    today: 'Hoy'
 };
 LocaleConfig.defaultLocale = 'es';
 
-// --- COMPONENTE PARA LA TARJETA DE CITA ---
+// Componente para representar cada tarjeta de cita
 const AppointmentCard = ({ appointment, onPress }) => {
+    
+    const appointmentTime = moment(appointment.appointment_time);
+    const hasTimePassed = appointmentTime.isBefore(moment());
+    
+    let displayStatus = appointment.status.status;
+    
+    // Determinar si la cita está perdida
+    if (hasTimePassed && displayStatus !== 'Completada' && displayStatus !== 'Cancelada') {
+        displayStatus = 'Perdida'; 
+    }
+    
     const statusColors = {
-        'Confirmada': { bg: '#A8E6DC80', text: '#027A74' }, // Verde claro
-        'Programada': { bg: '#FFF4CC', text: '#CDA37B' }, // Naranja claro
-        'Pendiente': { bg: '#FFF4CC', text: '#CDA37B' },   // Naranja claro
-        'Cancelada': { bg: '#FFD2D2', text: '#D32F2F' },  // Rojo claro
-        'Completada': { bg: '#D3E5FF', text: '#004085' }, // Azul claro
+        'Confirmada': { bg: '#A8E6DC80', text: '#027A74' },
+        'Programada': { bg: '#FFF4CC', text: '#CDA37B' }, 
+        'Pendiente': { bg: '#FFF4CC', text: '#CDA37B' },  
+        'Cancelada': { bg: '#FFD2D2', text: '#D32F2F' }, 
+        'Completada': { bg: '#D3E5FF', text: '#004085' },
+        'Perdida': { bg: COLORS.lightRed, text: COLORS.red }, 
     };
-    const statusStyle = statusColors[appointment.status.status] || statusColors['Programada'];
+    
+    const statusStyle = statusColors[displayStatus] || statusColors['Programada'];
 
     return (
         <TouchableOpacity style={styles.card} onPress={onPress}>
             <View style={styles.timeContainer}>
-                <Text style={styles.timeText}>{moment(appointment.appointment_time).format('HH:mm')}</Text>
+                <Text style={styles.timeText}>{appointmentTime.format('HH:mm')}</Text>
             </View>
             <View style={styles.detailsContainer}>
                 <Text style={styles.petName}>{appointment.pet.name}</Text>
                 <Text style={styles.reasonText}>{appointment.reason || 'Consulta General'}</Text>
                 <Text style={styles.vetText}>Con Dr. {appointment.vet.name}</Text>
-                <Text style={styles.dateText}>{moment(appointment.appointment_time).format('YYYY-MM-DD')}</Text>
+                <Text style={styles.dateText}>{appointmentTime.format('YYYY-MM-DD')}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                <Text style={[styles.statusText, { color: statusStyle.text }]}>{appointment.status.status}</Text>
+                <Text style={[styles.statusText, { color: statusStyle.text }]}>{displayStatus}</Text>
             </View>
         </TouchableOpacity>
     );
@@ -53,46 +65,42 @@ const AppointmentCard = ({ appointment, onPress }) => {
 
 
 export default function MisCitas({ navigation }) {
-    const [allAppointments, setAllAppointments] = useState([]);
-    const [loading, setLoading] = useState(true);
+    //estado para la fecha seleccionada y el mes actual
     const [selectedDate, setSelectedDate] = useState(moment().format('YYYY-MM-DD'));
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const isFocused = useIsFocused();
+    const { appointments: allAppointments, loading, refresh: fetchAppointmentsByMonth } = useAppointments();
 
-    const fetchAppointments = useCallback(async (month) => {
-        setLoading(true);
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Usuario no encontrado");
 
-            const startDate = moment(month).startOf('month').toISOString();
-            const endDate = moment(month).endOf('month').toISOString();
+    // Efecto para recargar las citas cuando la pantalla se enfoca o cambia el mes
+    useEffect(() => { 
+        if (isFocused) { 
+            fetchAppointmentsByMonth(currentMonth); 
+        } 
+    }, [isFocused, fetchAppointmentsByMonth, currentMonth]);
 
-            const { data, error } = await supabase.from('appointments').select(`id, appointment_time, reason, pet:pets(name), vet:profiles!vet_id(name), status:appointment_status(status)`).eq('client_id', user.id).gte('appointment_time', startDate).lte('appointment_time', endDate).order('appointment_time', { ascending: true });
-            if (error) throw error;
-            setAllAppointments(data || []);
-        } catch (error) {
-            Alert.alert("Error", "No se pudieron cargar tus citas.");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
 
-    useEffect(() => { if (isFocused) { fetchAppointments(currentMonth); } }, [isFocused, fetchAppointments, currentMonth]);
-
+    // Marcado de fechas en el calendario
     const markedDates = useMemo(() => {
         const markings = {};
         const dotColors = {
             'Confirmada': {key: 'Confirmada', color: COLORS.accent},
             'Programada': {key: 'Pendiente', color: COLORS.alert},
             'Pendiente': {key: 'Pendiente', color: COLORS.alert},
-            'Cancelada': {key: 'Cancelada', color: '#D32F2F'},
+            'Cancelada': {key: 'Cancelada', color: COLORS.red}, 
             'Completada': {key: 'Completada', color: '#004085'},
         };
 
         allAppointments.forEach(app => {
+            // Determinar el estado real de la cita
+            let statusKey = app.status.status;
+            if (moment(app.appointment_time).isBefore(moment()) && statusKey !== 'Completada' && statusKey !== 'Cancelada') {
+                 statusKey = 'Perdida';
+            }
+            
             const date = moment(app.appointment_time).format('YYYY-MM-DD');
-            const dot = dotColors[app.status.status] || {key: 'otro', color: 'grey'};
+            const dot = dotColors[statusKey] || {key: 'otro', color: 'grey'};
+            
             if (markings[date]) {
                 if (!markings[date].dots.find(d => d.key === dot.key)) {
                     markings[date].dots.push(dot);
@@ -105,18 +113,27 @@ export default function MisCitas({ navigation }) {
         if (markings[selectedDate]) {
             markings[selectedDate].selected = true;
         } else {
-            markings[selectedDate] = { selected: true, selectedColor: COLORS.primary };
+            markings[selectedDate] = { selected: true, selectedColor: COLORS.primary }; 
         }
         return markings;
     }, [allAppointments, selectedDate]);
 
+    // Citas filtradas para el día seleccionado
     const appointmentsForSelectedDay = useMemo(() => {
         return allAppointments.filter(app => moment(app.appointment_time).isSame(selectedDate, 'day'));
     }, [allAppointments, selectedDate]);
 
+
+    // Manejar el cambio de mes en el calendario
+    const handleMonthChange = (month) => {
+        setCurrentMonth(new Date(month.timestamp));
+    };
+
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+            
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
@@ -128,11 +145,12 @@ export default function MisCitas({ navigation }) {
                 </TouchableOpacity>
             </View>
 
+            {/* Calendario */}
             <Calendar
                 style={styles.calendar}
                 current={selectedDate}
                 onDayPress={day => setSelectedDate(day.dateString)}
-                onMonthChange={(month) => setCurrentMonth(new Date(month.timestamp))}
+                onMonthChange={handleMonthChange}
                 markingType={'multi-dot'}
                 markedDates={markedDates}
                 theme={{
@@ -151,14 +169,19 @@ export default function MisCitas({ navigation }) {
                 }}
             />
 
-            <Text style={styles.sectionTitle}>Próximas Citas</Text>
+            <Text style={styles.sectionTitle}>Citas para {moment(selectedDate).format('YYYY-MM-DD')}</Text>
             
             {loading ? ( <ActivityIndicator style={{ flex: 1 }} size="large" color={COLORS.accent} /> ) 
             : (
                 <FlatList
                     data={appointmentsForSelectedDay}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (<AppointmentCard appointment={item} onPress={() => navigation.navigate('DetalleCita', { appointmentId: item.id })} />)}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                        <AppointmentCard 
+                            appointment={item} 
+                            onPress={() => navigation.navigate('DetalleCita', { appointmentId: item.id })} 
+                        />
+                    )}
                     contentContainerStyle={styles.list}
                     ListEmptyComponent={<Text style={styles.emptyText}>No tienes citas para este día.</Text>}
                 />
@@ -166,7 +189,6 @@ export default function MisCitas({ navigation }) {
         </SafeAreaView>
     );
 }
-
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.primary },

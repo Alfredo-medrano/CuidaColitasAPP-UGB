@@ -9,6 +9,7 @@ import HomeHeader from '../../components/client/HomeHeader';
 import NotificationCard from '../../components/client/NotificationCard';
 import ActionButton from '../../components/client/ActionButton';
 
+// Configuración de acciones rápidas
 const quickActions = [
   { id: '1', icon: 'paw-outline', label: 'Mis Mascotas', screen: 'MisMascotas' },
   { id: '2', icon: 'calendar-outline', label: 'Mis Citas', screen: 'MisCitas' },
@@ -16,6 +17,7 @@ const quickActions = [
   { id: '4', icon: 'add-circle-outline', label: 'Pedir Cita', screen: 'SolicitarCita' },
 ];
 
+// Componente principal de la pantalla de inicio del cliente
 export default function ClienteHome({ navigation }) {
   const isFocused = useIsFocused();
   const { profile } = useAuth();
@@ -88,7 +90,6 @@ export default function ClienteHome({ navigation }) {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.primary },
   centeredLoader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.primary },

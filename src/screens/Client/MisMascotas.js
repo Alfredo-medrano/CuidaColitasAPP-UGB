@@ -1,19 +1,13 @@
-// src/screens/Client/MisMascotas.js
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    View, Text, StyleSheet, FlatList, TextInput, 
-    ActivityIndicator, Alert, TouchableOpacity,
-    StatusBar 
-} from 'react-native';
-import { supabase } from '../../api/Supabase';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator, Alert, TouchableOpacity, StatusBar } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+import { usePets } from '../../hooks/usePets'; 
 
-// ... (El componente PetCard no cambia)
-const PetCard = ({ pet, onPress }) => {
+// Componente para renderizar cada tarjeta de mascota
+const PetCard = ({ pet, onPress }) => { 
     const getStatusStyle = (status) => {
         switch (status) {
             case 'En Tratamiento':
@@ -40,7 +34,7 @@ const PetCard = ({ pet, onPress }) => {
             <View style={styles.cardBody}>
                 <Text style={styles.detailText}>Edad: {age}</Text>
                 <Text style={styles.detailText}>Peso: {pet.weight_kg || 'N/A'} kg</Text>
-                <Text style={styles.detailText}>Veterinario: Dr. {pet.veterinarian?.name.split(' ')[0] || 'No asignado'}</Text>
+                <Text style={styles.detailText}>Veterinario: Dr. {pet.veterinarian?.name?.split(' ')[0] || 'No asignado'}</Text>
                 <Text style={styles.detailText}>Última visita: 2024-01-12</Text>
             </View>
             <View style={styles.cardFooter}>
@@ -59,43 +53,36 @@ const PetCard = ({ pet, onPress }) => {
 
 
 export default function MisMascotas({ navigation }) {
-    const [pets, setPets] = useState([]);
+    // Uso del hook personalizado usePets para manejar mascotas y estado de carga
+    const { pets, loading, refresh } = usePets();
     const [filteredPets, setFilteredPets] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const isFocused = useIsFocused();
+    
+    // Efecto para recargar mascotas al enfocar la pantalla
+    useEffect(() => { 
+        if (isFocused) { 
+            refresh(); 
+        } 
+    }, [isFocused, refresh]);
 
-    // ... (la lógica de fetch no cambia)
-    const fetchPets = useCallback(async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Usuario no encontrado");
-            const { data, error } = await supabase.from('pets').select(`id, name, breed, status, birth_date, weight_kg, species:pet_species (name), veterinarian:profiles!primary_vet_id (name)`).eq('owner_id', user.id).order('name', { ascending: true });
-            if (error) throw error;
-            setPets(data || []);
-            setFilteredPets(data || []);
-        } catch (error) {
-            Alert.alert("Error", "No se pudieron cargar tus mascotas.");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-    useEffect(() => { if (isFocused) { setLoading(true); fetchPets(); } }, [isFocused, fetchPets]);
+    // Efecto para filtrar mascotas según el término de búsqueda
     useEffect(() => {
         if (searchTerm) {
-            const filtered = pets.filter(pet => pet.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            const filtered = pets.filter(pet => 
+                pet.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
             setFilteredPets(filtered);
-        } else { setFilteredPets(pets); }
+        } else { 
+            setFilteredPets(pets); 
+        }
     }, [searchTerm, pets]);
-
 
     if (loading) {
         return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.accent} /></View>;
     }
 
     return (
-        // ----- CORRECCIÓN AQUÍ -----
-        // SafeAreaView ahora envuelve toda la pantalla y gestionará el padding del notch.
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
             
@@ -119,7 +106,7 @@ export default function MisMascotas({ navigation }) {
             </View>
 
             <FlatList
-                data={filteredPets}
+                data={filteredPets} 
                 renderItem={({ item }) => (
                     <PetCard 
                         pet={item} 
@@ -144,28 +131,15 @@ export default function MisMascotas({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.primary,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        // ----- CORRECCIÓN AQUÍ -----
-        // Se elimina el paddingTop manual y se usa un padding vertical simple.
-        paddingVertical: 10,
-    },
-    // ... (el resto de los estilos no cambian)
-    headerButton: { width: 30 },
+    container: { flex: 1, backgroundColor: COLORS.primary, },
+    header: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, addingVertical: 10, backgroundColor: COLORS.primary, },headerButton: { width: 30 },
     headerTitle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.h2, color: COLORS.textPrimary },
     searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary, borderRadius: 12, marginHorizontal: 20, marginVertical: 10, paddingHorizontal: 15 },
     searchInput: { flex: 1, height: 50, fontFamily: FONTS.PoppinsRegular, fontSize: 16, color: COLORS.primary, marginLeft: 10 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50, paddingHorizontal: 20 },
     emptyText: { fontFamily: FONTS.PoppinsRegular, fontSize: 16, color: COLORS.secondary, textAlign: 'center', marginTop: 10 },
     list: { paddingHorizontal: 20, paddingBottom: 20 },
-    card: { backgroundColor: COLORS.card, borderRadius: 16, marginBottom: 15, overflow: 'hidden' },
+    card: { backgroundColor: COLORS.card, borderRadius: 16, marginBottom: 15, overflow: 'hidden', borderColor: COLORS.border, borderWidth: 1 },
     cardHeader: { flexDirection: 'row', padding: 15, alignItems: 'flex-start' },
     petIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: `${COLORS.accent}30`, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
     petTitle: { flex: 1 },
@@ -175,7 +149,7 @@ const styles = StyleSheet.create({
     statusText: { fontFamily: FONTS.PoppinsBold, fontSize: 12 },
     cardBody: { paddingHorizontal: 20, paddingBottom: 15 },
     detailText: { fontFamily: FONTS.PoppinsRegular, fontSize: 14, color: COLORS.secondary, marginBottom: 4 },
-    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: `${COLORS.primary}90`, padding: 15 },
+    cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: `${COLORS.primary}10`, padding: 15 },
     nextAppointmentLabel: { fontFamily: FONTS.PoppinsRegular, fontSize: 12, color: COLORS.secondary },
     nextAppointmentDate: { fontFamily: FONTS.PoppinsBold, fontSize: 16, color: COLORS.textPrimary },
     historyButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 15 },

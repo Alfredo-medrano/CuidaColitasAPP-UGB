@@ -23,6 +23,7 @@ const NotificationItem = ({ item }) => (
   </View>
 );
 
+// Componente principal de Notificaciones
 export default function Notificaciones() {
   const isFocused = useIsFocused();
   const { allNotifications, loading, refresh, markAllAsRead } = useNotifications();
@@ -65,7 +66,7 @@ export default function Notificaciones() {
   );
 }
 
-// Estilos
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.primary },
   centeredLoader: { flex: 1, justifyContent: 'center', alignItems: 'center' },

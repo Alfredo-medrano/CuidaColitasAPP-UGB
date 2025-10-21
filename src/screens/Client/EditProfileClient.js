@@ -1,25 +1,17 @@
-// src/screens/Client/EditProfileClient.js
-
 import React, { useState, useEffect } from 'react';
-import {
-    View, Text, StyleSheet, ScrollView, TextInput, Alert,
-    ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform,
-    Dimensions
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform, Dimensions } from 'react-native';
 import { supabase } from '../../api/Supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-// --- UTILIDAD PARA TAMAÑOS RESPONSIVOS ---
+// Función para tamaños responsivos
 const { width } = Dimensions.get('window');
 const guidelineBaseWidth = 375;
-
 const responsiveSize = (size) => (width / guidelineBaseWidth) * size;
 
-// --- COMPONENTES INTERNOS ---
-
+//componente de entrada de formulario
 const FormInput = ({ label, value, onChangeText, placeholder, ...props }) => (
     <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>{label}</Text>
@@ -54,7 +46,7 @@ const SecondaryButton = ({ title, onPress, disabled, icon, color = COLORS.primar
     </TouchableOpacity>
 );
 
-// --- PANTALLA PRINCIPAL ---
+//pantalla de edición de perfil del cliente
 
 export default function EditProfileClient({ route, navigation }) {
     const { profile: initialProfile } = route.params;
@@ -67,6 +59,7 @@ export default function EditProfileClient({ route, navigation }) {
     const [emergencyPhone, setEmergencyPhone] = useState('');
     const [avatarUrl, setAvatarUrl] = useState(null);
 
+    // Cargar datos iniciales del perfil
     useEffect(() => {
         if (initialProfile) {
             setName(initialProfile.name || '');
@@ -78,6 +71,7 @@ export default function EditProfileClient({ route, navigation }) {
         }
     }, [initialProfile]);
 
+    // Función para seleccionar imagen de avatar
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
@@ -97,6 +91,7 @@ export default function EditProfileClient({ route, navigation }) {
         }
     };
 
+    // Función para subir avatar a Supabase Storage
     const uploadAvatar = async (uri) => {
         try {
             setUploading(true);
@@ -120,6 +115,7 @@ export default function EditProfileClient({ route, navigation }) {
         }
     };
 
+    // Función para guardar los cambios del perfil
     const handleSave = async () => {
         try {
             setSaving(true);

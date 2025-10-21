@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../api/Supabase';
 
+/**
+ * Hook para manejar la lógica de notificaciones de un usuario.
+ * Se encarga de la autenticación, la consulta de la API y el manejo del estado.
+ */
 export function useNotifications() {
   const [allNotifications, setAllNotifications] = useState([]);
   const [unreadNotifications, setUnreadNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Función para cargar notificaciones
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
@@ -37,6 +42,7 @@ export function useNotifications() {
     }
   }, []);
   
+  // Función para marcar todas las notificaciones como leídas
   const markAllAsRead = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -58,6 +64,7 @@ export function useNotifications() {
     }
   }, [unreadCount]);
 
+  // Carga inicial de notificaciones
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);

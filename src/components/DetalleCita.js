@@ -20,6 +20,7 @@ const InfoRow = ({ icon, label, value }) => (
     </View>
 );
 
+// Componente principal de DetalleCita
 export default function DetalleCita({ navigation, route }) {
     const { appointmentId, userRole } = route.params;
     const [appointment, setAppointment] = useState(null);
@@ -48,13 +49,14 @@ export default function DetalleCita({ navigation, route }) {
             setLoading(false);
         }
     }, [appointmentId]);
-
+    
     useEffect(() => {
         if (isFocused) {
             fetchAppointmentDetails();
         }
     }, [isFocused, fetchAppointmentDetails]);
 
+    // Función para manejar la cancelación de la cita
     const handleCancelAppointment = () => {
         Alert.alert(
             "Confirmar Cancelación",
@@ -97,7 +99,7 @@ export default function DetalleCita({ navigation, route }) {
             ]
         );
     };
-
+    // Mostrar indicador de carga mientras se obtienen los datos
     if (loading || !appointment) {
         return (
             <View style={styles.centered}>

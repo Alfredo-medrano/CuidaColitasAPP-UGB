@@ -1,37 +1,17 @@
-// src/screens/Client/ProfileCliente.js
-
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Image,
-  TouchableOpacity,
-  StatusBar,
-  FlatList,
-  Platform,
-  Dimensions, // <-- 1. Importar Dimensions
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, FlatList,Platform, Dimensions, } from 'react-native';
 import { supabase } from '../../api/Supabase';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-// --- INICIO DE CAMBIOS: UTILIDAD PARA TAMAÑOS RESPONSIVOS ---
+//función para obtener tamaños responsivos y proporcionales
 const { width } = Dimensions.get('window');
-const guidelineBaseWidth = 375; // Ancho base de un iPhone 8/X
-
-// Función para escalar los tamaños de forma proporcional
+const guidelineBaseWidth = 375; 
 const responsiveSize = (size) => (width / guidelineBaseWidth) * size;
-// --- FIN DE CAMBIOS ---
 
-
-// --- COMPONENTES INTERNOS (Sin cambios, ya estaban bien) ---
-
+//componentes internos 
 const InfoRow = ({ icon, text, iconColor = COLORS.primary }) => (
   <View style={styles.infoRow}>
     <Ionicons name={icon} size={responsiveSize(22)} color={iconColor} style={styles.infoIcon} />
@@ -74,7 +54,7 @@ const PetListItem = ({ pet }) => {
     );
 };
 
-// --- PANTALLA PRINCIPAL ---
+//componente principal de la pantalla de perfil del cliente
 
 export default function ProfileCliente({ navigation }) {
   const [profile, setProfile] = useState(null);
@@ -82,6 +62,7 @@ export default function ProfileCliente({ navigation }) {
   const [loading, setLoading] = useState(true);
   const isFocused = useIsFocused();
 
+  // Función para obtener el perfil y las mascotas del usuario
   const fetchProfile = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -142,7 +123,6 @@ export default function ProfileCliente({ navigation }) {
   }
 
   return (
-    // --- INICIO DE CAMBIOS: ESTRUCTURA PARA SAFE AREA ---
     <View style={styles.rootContainer}>
         <SafeAreaView style={styles.safeContainer}>
             <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
@@ -203,17 +183,15 @@ export default function ProfileCliente({ navigation }) {
             </ScrollView>
         </SafeAreaView>
     </View>
-    // --- FIN DE CAMBIOS ---
   );
 }
 
-// --- INICIO DE CAMBIOS: ESTILOS RESPONSIVOS ---
 const styles = StyleSheet.create({
-  rootContainer: { // Nuevo estilo para el contenedor raíz
+  rootContainer: {
     flex: 1,
-    backgroundColor: COLORS.primary, // El color de fondo se aplica aquí para cubrir toda la pantalla
+    backgroundColor: COLORS.primary, 
   },
-  safeContainer: { // Nuevo estilo para el SafeAreaView
+  safeContainer: { 
     flex: 1,
   },
   loaderContainer: {
@@ -238,7 +216,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: FONTS.PoppinsSemiBold,
-    fontSize: responsiveSize(22), // SIZES.h2 suele ser 22
+    fontSize: responsiveSize(22), 
     color: COLORS.textPrimary,
   },
   editHeaderButton: {
@@ -251,7 +229,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: responsiveSize(100),
     height: responsiveSize(100),
-    borderRadius: responsiveSize(50), // La mitad del width/height
+    borderRadius: responsiveSize(50),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: responsiveSize(15),
@@ -279,7 +257,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontFamily: FONTS.PoppinsSemiBold,
-    fontSize: responsiveSize(18), // SIZES.h3 suele ser 18
+    fontSize: responsiveSize(18),
     color: COLORS.primary,
     marginBottom: responsiveSize(15),
   },

@@ -3,18 +3,19 @@ import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
-
 import ClientTabVisitas from './ClientTabVisitas';
 import ClientTabVacunas from './ClientTabVacunas';
 import ClientTabMedicamentos from './ClientTabMedicamentos';
 import ClientTabArchivos from './ClientTabArchivos';
 
+// Nombres de las pestañas
 const TABS = ['Visitas', 'Vacunas', 'Medicamentos', 'Archivos'];
 
 export default function HistorialMedicoC({ route, navigation }) {
     const { petId, petName, petSpecies } = route.params; 
     const [activeTab, setActiveTab] = useState('Visitas');
 
+    // Renderiza el contenido según la pestaña activa
     const renderContent = () => {
         switch (activeTab) {
             case 'Visitas': return <ClientTabVisitas petId={petId} />;
