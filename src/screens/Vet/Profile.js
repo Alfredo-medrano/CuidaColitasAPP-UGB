@@ -1,135 +1,301 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, Image } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome5';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { supabase } from '../../api/Supabase';
+import { useAuth } from '../../context/AuthContext';
+// Importamos SOLO lo que existe en theme.js
+import { COLORS, FONTS, SIZES } from '../../theme/theme'; 
+import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 
-export default function Profile({ navigation }) {
-  const [profile, setProfile] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const isFocused = useIsFocused();
+// --- DEFINICIÓN DE ESTILOS FALTANTES (Recreando 'text' y 'radius' localmente) ---
 
-  React.useEffect(() => {
-    if (isFocused) {
-      const fetchProfile = async () => {
-        setLoading(true);
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error("Usuario no encontrado");
-          const { data, error } = await supabase
-            .from('profiles')
-            .select(`
-              *,
-              roles ( name )
-            `)
-            .eq('id', user.id)
-            .single();
-
-          if (error) throw error;
-          
-          const fullProfile = {
-            ...data,
-            role: data.roles.name,
-            email: user.email,
-          };
-          setProfile(fullProfile);
-
-        } catch (error) {
-          Alert.alert("Error", "No se pudo cargar el perfil.");
-          console.error(error.message);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchProfile();
+// 1. Estructura de Texto (Reemplaza a 'text')
+const TEXT_STYLES = {
+    h3: { 
+        fontFamily: FONTS.PoppinsSemiBold,
+        fontSize: SIZES.h3, 
+    },
+    h4: {
+        fontFamily: FONTS.PoppinsSemiBold, 
+        fontSize: SIZES.h3,
+    },
+    body: {
+        fontFamily: FONTS.PoppinsRegular,
+        fontSize: SIZES.body,
+    },
+    bodyBold: {
+        fontFamily: FONTS.PoppinsBold,
+        fontSize: SIZES.body,
     }
-  }, [isFocused]);
+};
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+// 2. Radios de Borde (Reemplaza a 'radius')
+const RADIUS = {
+    m: 8, // Valor asumido para un borde medio
+};
 
-  if (loading) {
-    return <View style={styles.loaderContainer}><ActivityIndicator size="large" color="#fff" /></View>;
-  }
-  if (!profile) {
-    return <View style={styles.loaderContainer}><Text style={styles.errorText}>No se encontró el perfil.</Text></View>;
-  }
+// --- Componentes de UI Internos (Diseño Nuevo) ---
 
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-        ) : (
-            <View style={styles.avatarPlaceholder}>
-                <Icon name="stethoscope" size={50} color="#013847" />
-            </View>
-        )}
-        <Text style={styles.name}>{profile.name || 'Nombre no disponible'}</Text>
-        <Text style={styles.title}>{profile.title || 'Título no disponible'}</Text>
-        {profile.is_verified && (
-          <View style={styles.verifiedBadge}>
-            <Text style={styles.verifiedText}>Verificado</Text>
-          </View>
-        )}
-      </View>
+const Header = ({ onEdit }) => (
+    <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Perfil</Text>
+        <TouchableOpacity onPress={onEdit}>
+            <Text style={styles.editButton}>Editar</Text>
+        </TouchableOpacity>
+    </View>
+);
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Información Personal</Text>
-        <View style={styles.infoRow}><Icon name="envelope" size={16} color="#888" /><Text style={styles.infoText}>{profile.email}</Text></View>
-        <View style={styles.infoRow}><Icon name="phone" size={16} color="#888" /><Text style={styles.infoText}>{profile.phone_number || 'No especificado'}</Text></View>
-        <View style={styles.infoRow}><Icon name="graduation-cap" size={16} color="#888" /><Text style={styles.infoText}>Colegio: {profile.college_id || 'N/A'}</Text></View>
-      </View>
+const UserInfoCard = ({ profile }) => {
+    const memberSince = profile?.created_at 
+        ? new Date(profile.created_at).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+          })
+        : '...';
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Especialidades</Text>
-        <View style={styles.specialtiesContainer}>
-          {profile.specialties?.map((spec, index) => (
-            <View key={index} style={styles.specialtyTag}><Text style={styles.specialtyText}>{spec}</Text></View>
-          ))}
+    const avatarUrl = profile?.avatar_url || 'https://via.placeholder.com/100';
+
+    return (
+        <View style={styles.userInfoCard}>
+            <Image 
+                source={{ uri: avatarUrl }} 
+                style={styles.avatar} 
+            />
+            <Text style={styles.userName}>
+                {profile?.nombre || 'Cargando...'} {profile?.apellido || ''}
+            </Text>
+            <Text style={styles.memberSince}>
+                {profile?.role ? `Rol: ${profile.role} | ` : ''}Miembro desde {memberSince}
+            </Text>
         </View>
-      </View>
+    );
+};
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Biografía</Text>
-        <Text style={styles.biographyText}>{profile.biography || 'Sin biografía.'}</Text>
-      </View>
+const MenuItem = ({ icon, label, onPress, isLogout = false }) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+        <View style={styles.menuIconContainer}>
+            <Feather 
+                name={icon} 
+                size={22} 
+                color={isLogout ? COLORS.red : COLORS.primary} 
+            />
+        </View>
+        <Text style={[styles.menuLabel, isLogout && styles.logoutText]}>
+            {label}
+        </Text>
+        {!isLogout && (
+            <Feather 
+                name="chevron-right" 
+                size={22} 
+                color={COLORS.card} 
+            />
+        )}
+    </TouchableOpacity>
+);
 
-      <Pressable style={styles.editButton} onPress={() => navigation.navigate('EditProfile', { profile: profile })}>
-        <Icon name="pencil-alt" size={16} color="#013847" />
-        <Text style={styles.editButtonText}>Editar Perfil</Text>
-      </Pressable>
+// --- Componente Principal de la Pantalla ---
 
-      <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-      </Pressable>
-    </ScrollView>
-  );
+export default function Profile({ navigation }) {
+    const { session } = useAuth();
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const isFocused = useIsFocused();
+
+    const getProfile = useCallback(async () => {
+        if (!session?.user) return;
+
+        try {
+            setLoading(true);
+            const { user } = session;
+            
+            // ==========================================================
+            // AQUÍ ESTÁ LA CORRECCIÓN: 'profiles' en lugar de 'perfiles'
+            // ==========================================================
+            let { data, error, status } = await supabase
+                .from('profiles') 
+                .select(`
+                    *,
+                    roles ( name )
+                `)
+                .eq('id', user.id)
+                .single();
+
+            if (error && status !== 406) {
+                throw error;
+            }
+
+            if (data) {
+                const fullProfile = {
+                    ...data,
+                    // Tu tabla se llama 'profiles', no 'perfiles'
+                    // Y la columna de rol se llama 'role_id' en la BD, no 'roles'
+                    // Así que ajustamos la consulta para que coincida con tu BD
+                    role: data.roles ? data.roles.name : 'Veterinario',
+                    email: user.email,
+                    nombre: data.name, // Aseguramos que 'nombre' se mapee desde 'name'
+                    apellido: '', // Tu BD 'profiles' no tiene 'apellido', solo 'name'
+                };
+                setProfile(fullProfile);
+            }
+        } catch (error) {
+            Alert.alert("Error", error.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [session]);
+
+    useEffect(() => {
+        if (session && isFocused) {
+            getProfile();
+        }
+    }, [session, isFocused, getProfile]);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+    };
+
+    if (loading && !profile) {
+        return (
+            <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
+    }
+
+    return (
+        <ScrollView 
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+        >
+            <Header onEdit={() => navigation.navigate('EditProfile', { profile: profile })} />
+            
+            <UserInfoCard profile={profile} />
+
+            <View style={styles.menuGroup}>
+                <MenuItem 
+                    icon="user" 
+                    label="Mi perfil" 
+                    onPress={() => navigation.navigate('EditProfile', { profile: profile })} 
+                />
+                <MenuItem 
+                    icon="bell" 
+                    label="Notificaciones" 
+                    onPress={() => { /* TODO: Navegar a Notificaciones */ }} 
+                />
+                <MenuItem 
+                    icon="credit-card" 
+                    label="Método de pago" 
+                    onPress={() => { /* TODO: Navegar a Pagos */ }} 
+                />
+            </View>
+
+            <View style={styles.menuGroup}>
+                <MenuItem 
+                    icon="help-circle" 
+                    label="Soporte" 
+                    onPress={() => { /* TODO: Navegar a Soporte */ }} 
+                />
+                <MenuItem 
+                    icon="log-out" 
+                    label="Cerrar sesión" 
+                    onPress={handleLogout}
+                    isLogout={true}
+                />
+            </View>
+            
+        </ScrollView>
+    );
 }
 
+// --- Estilos (Usando TEXT_STYLES y RADIUS locales) ---
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#013847' },
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#013847' },
-  errorText: { color: '#fff', fontSize: 18 },
-  header: { alignItems: 'center', paddingVertical: 30, paddingHorizontal: 20 },
-  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 15 },
-  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  name: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
-  title: { fontSize: 16, color: '#d3d3d3', marginTop: 4 },
-  verifiedBadge: { backgroundColor: '#43C0AF', borderRadius: 12, paddingVertical: 4, paddingHorizontal: 12, marginTop: 10 },
-  verifiedText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginHorizontal: 20, marginBottom: 15 },
-  cardTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 15 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  infoText: { fontSize: 16, color: '#555', marginLeft: 15 },
-  specialtiesContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  specialtyTag: { backgroundColor: '#f0f0f0', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8, marginBottom: 8 },
-  specialtyText: { color: '#555' },
-  biographyText: { fontSize: 14, color: '#555', lineHeight: 20 },
-  editButton: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, padding: 15, marginHorizontal: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  editButtonText: { color: '#013847', fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
-  logoutButton: { backgroundColor: '#FF4136', borderRadius: 12, padding: 15, marginHorizontal: 20, alignItems: 'center', marginBottom: 40 },
-  logoutButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.secondary, 
+    },
+    loaderContainer: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: COLORS.secondary 
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+    },
+    headerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    headerTitle: {
+        ...TEXT_STYLES.h3, 
+        color: COLORS.primary, 
+    },
+    editButton: {
+        ...TEXT_STYLES.bodyBold, 
+        color: COLORS.primary, 
+        fontSize: 16,
+    },
+    userInfoCard: {
+        backgroundColor: COLORS.white, 
+        borderRadius: RADIUS.m, 
+        padding: 24,
+        alignItems: 'center',
+        marginBottom: 30,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        marginBottom: 16,
+        borderWidth: 3,
+        borderColor: COLORS.primary, 
+    },
+    userName: {
+        ...TEXT_STYLES.h4, 
+        color: COLORS.primary, 
+        marginBottom: 4,
+    },
+    memberSince: {
+        ...TEXT_STYLES.body, 
+        color: COLORS.card, 
+        fontSize: SIZES.caption,
+    },
+    menuGroup: {
+        backgroundColor: COLORS.white, 
+        borderRadius: RADIUS.m, 
+        marginBottom: 20,
+        overflow: 'hidden',
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.secondary, 
+    },
+    menuIconContainer: {
+        width: 32,
+        alignItems: 'center',
+    },
+    menuLabel: {
+        ...TEXT_STYLES.body, 
+        color: COLORS.primary, 
+        fontSize: SIZES.h3,
+        marginLeft: 16,
+        flex: 1,
+    },
+    logoutText: {
+        color: COLORS.red, 
+        fontFamily: FONTS.PoppinsBold, 
+    }
 });
