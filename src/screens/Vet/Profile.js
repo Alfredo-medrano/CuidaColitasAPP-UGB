@@ -1,399 +1,362 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from 'react-native'; // Añadida Image
-import { SafeAreaView } from 'react-native-safe-area-context'; 
-import { supabase } from '../../api/Supabase'; // Mantenido por si es necesario
-import { useAuth } from '../../context/AuthContext';
-import { COLORS, FONTS, SIZES } from '../../theme/theme'; 
+// src/screens/Vet/Profile.js
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
+import { supabase } from '../../api/Supabase';
+import { useAuth } from '../../context/AuthContext'; // 👈 usa el contexto
+import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-// --- Componentes Reutilizables ---
-
-// Fila de Información Profesional
-const InfoRow = ({ icon, value }) => (
-    <View style={profileStyles.infoRow}>
-        <Ionicons name={icon} size={20} color={COLORS.primary} style={profileStyles.infoIcon} />
-        <Text style={profileStyles.infoValue}>{value || 'No especificado'}</Text>
-    </View>
+// ---------------------- UI Atoms ----------------------
+const Pill = ({ children, bg, color }) => (
+  <View style={[styles.pill, { backgroundColor: bg }]}>
+    <Text style={[styles.pillText, { color }]}>{children}</Text>
+  </View>
 );
 
-// Tarjeta de Paciente Reciente 
-const PatientCard = ({ patientName, ownerName, petType, status }) => {
-    
-    const statusText = status || 'N/A';
-    
-    const statusColors = {
-        'Tratamiento': { bg: `${COLORS.alert}40`, text: COLORS.primary }, 
-        'Postoperatorio': { bg: `${COLORS.red}40`, text: COLORS.red }, 
-        'Control rutinario': { bg: `${COLORS.accent}40`, text: COLORS.primary }, 
-        'default': { bg: `${COLORS.secondary}40`, text: COLORS.primary }
-    };
-    
-    const { bg, text } = statusColors[statusText] || statusColors['default'];
-
-    return (
-        <View style={profileStyles.patientItem}>
-            <Ionicons 
-                name={petType === 'Gato' ? 'cat' : 'paw'} 
-                size={18} 
-                color={COLORS.textPrimary} 
-                style={{ marginRight: 10 }} 
-            />
-            <View style={profileStyles.patientDetails}>
-                <Text style={profileStyles.patientName}>{patientName}</Text>
-                <Text style={profileStyles.patientOwner}>{ownerName}</Text>
-            </View>
-            <View style={[profileStyles.statusBadge, { backgroundColor: bg }]}>
-                <Text style={[profileStyles.statusBadgeText, { color: text }]}>
-                    {statusText}
-                </Text> 
-            </View>
-        </View>
-    );
+const StatCard = ({ icon, value, label, tone = 'blue' }) => {
+  const tones = {
+    blue: { bg: COLORS.lightBlue, fg: COLORS.card },
+    red: { bg: COLORS.lightRed, fg: COLORS.red },
+    green: { bg: COLORS.lightGreen, fg: COLORS.accent },
+  };
+  return (
+    <View style={[styles.statCard, { backgroundColor: tones[tone].bg }]}>
+      <Ionicons name={icon} size={24} color={tones[tone].fg} />
+      <Text style={[styles.statValue, { color: COLORS.primary }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: COLORS.card }]}>{label}</Text>
+    </View>
+  );
 };
 
+const Row = ({ icon, label, value }) => (
+  <View style={styles.row}>
+    <Ionicons name={icon} size={18} color={COLORS.card} style={{ width: 22 }} />
+    <Text style={styles.rowLabel}>{label}</Text>
+    <Text style={styles.rowValue}>{value || '—'}</Text>
+  </View>
+);
 
-// --- Componente Principal ---
+// ---------------------- Header ----------------------
+const Header = ({ name, title }) => (
+  <View style={styles.headerContainer}>
+    <View style={styles.headerLeft}>
+      <View style={styles.headerAvatar}>
+        <Ionicons name="medical" size={26} color={COLORS.white} />
+      </View>
+      <View style={{ marginLeft: 12 }}>
+        <Text style={styles.headerName}>{name || 'Veterinario'}</Text>
+        <Text style={styles.headerSubtitle}>{title || 'Médico General Veterinario'}</Text>
+      </View>
+    </View>
+  </View>
+);
 
+// ---------------------- Main ----------------------
 export default function Profile({ navigation }) {
-    // ⭐️ CAMBIO CRÍTICO: Eliminamos el estado local 'profile' para usar el contexto directamente
-    const { session, profile: authProfile, signOut, refetchProfile, loading: authLoading } = useAuth(); 
-    const isFocused = useIsFocused();
-    
-    // Mantenemos solo el estado de carga para la recarga manual
-    const [loading, setLoading] = useState(false); 
+  const { session } = useAuth();
+  const { avatarUrl } = useAuth(); // 👈 URL firmada lista para <Image/>
+  const isFocused = useIsFocused();
 
-    // Lógica de Recarga al Enfocar (mantiene ISO 25012: Precisión)
-    const refreshProfile = useCallback(() => {
-        if (refetchProfile) {
-            setLoading(true);
-            // refetchProfile() es la única fuente que actualiza authProfile
-            refetchProfile().finally(() => setLoading(false)); 
-        }
-    }, [refetchProfile]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        if (isFocused) {
-            refreshProfile(); 
-        }
-    }, [isFocused, refreshProfile]);
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({ todayAppointments: 0, inTreatment: 0 });
+  const [recentPatients, setRecentPatients] = useState([]);
 
-    // Los datos ahora usan la variable 'authProfile' directamente
-    const profile = authProfile; 
-    
-    // Datos simulados (deben ser reemplazados por hooks reales para cumplir ISO 25010)
-    const statsData = { citas: 4, tratamiento: 2 };
-    const recentPatients = [
-        { id: 1, name: 'Luna', owner: 'María García', type: 'Gato', status: 'Tratamiento' },
-        { id: 2, name: 'Charlie', owner: 'Juan Pérez', type: 'Perro', status: 'Postoperatorio' },
-        { id: 3, name: 'Max', owner: 'Ana López', type: 'Perro', status: 'Control rutinario' },
-    ];
-    
-    if (authLoading || loading) {
-        return (
-            <View style={profileStyles.loaderContainer}>
-                <ActivityIndicator size="large" color={COLORS.accent} />
-            </View>
-        );
+  const userId = session?.user?.id;
+  const userEmail = session?.user?.email || '';
+
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setLoading(true);
+
+      // 1) Perfil + Rol + Clínica
+      const { data: prof, error: profErr } = await supabase
+        .from('profiles')
+        .select(`
+          id,name,title,phone_number,college_id,address,avatar_url,created_at,
+          roles:role_id ( name ),
+          clinics:clinic_id ( name,address,phone_number )
+        `)
+        .eq('id', userId)
+        .single();
+
+      if (profErr) throw profErr;
+
+      const normalized = {
+        ...prof,
+        role: prof?.roles?.name || 'veterinario',
+        clinic: prof?.clinics?.name || 'Clínica Veterinaria CuidaColitas',
+        clinic_address: prof?.clinics?.address || '',
+        clinic_phone: prof?.clinics?.phone_number || '',
+        email: userEmail,
+      };
+      setProfile(normalized);
+
+      // 2) Estadística "Citas de hoy" (Programada/Confirmada)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const { data: stRows, error: stErr } = await supabase
+        .from('appointment_status')
+        .select('id,status')
+        .in('status', ['Programada', 'Confirmada']);
+      if (stErr) throw stErr;
+      const statusIds = (stRows || []).map(r => r.id);
+
+      const { count: apptCount, error: apptErr } = await supabase
+        .from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('vet_id', userId)
+        .gte('appointment_time', todayStart.toISOString())
+        .lte('appointment_time', todayEnd.toISOString())
+        .in('status_id', statusIds);
+      if (apptErr) throw apptErr;
+
+      // 3) "En Tratamiento"
+      const { count: inTreat, error: petErr } = await supabase
+        .from('pets')
+        .select('id', { count: 'exact', head: true })
+        .eq('primary_vet_id', userId)
+        .eq('status', 'En Tratamiento');
+      if (petErr) throw petErr;
+
+      setStats({
+        todayAppointments: apptCount || 0,
+        inTreatment: inTreat || 0,
+      });
+
+      // 4) Pacientes recientes
+      const { data: recent, error: recErr } = await supabase
+        .from('appointments')
+        .select(`
+          id, appointment_time, reason,
+          pets:pet_id ( id, name, species_id, status ),
+          owner:client_id ( name ),
+          medical_records ( treatment )
+        `)
+        .eq('vet_id', userId)
+        .order('appointment_time', { ascending: false })
+        .limit(3);
+      if (recErr) throw recErr;
+
+      const pretty = (recent || []).map(a => {
+        let tag = 'Control rutinario';
+        const txt = (a?.reason || '').toLowerCase();
+        if (a?.medical_records?.length && a.medical_records[0]?.treatment) tag = 'Tratamiento';
+        else if (txt.includes('post') || txt.includes('sutura') || txt.includes('operat')) tag = 'Postoperatorio';
+        else if (a?.pets?.status === 'En Tratamiento') tag = 'Tratamiento';
+
+        return {
+          id: a.id,
+          petName: a?.pets?.name || 'Paciente',
+          ownerName: a?.owner?.name || 'Dueño',
+          tag,
+        };
+      });
+
+      setRecentPatients(pretty);
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'No se pudo cargar el perfil.');
+    } finally {
+      setLoading(false);
     }
-    
-    // Mapeo de datos usando la referencia directa 'profile' (que es 'authProfile')
-    const vetName = profile?.name || 'González';
-    const vetTitle = profile?.title || 'Médico General Veterinario';
-    const clinicName = 'Clínica Veterinaria CuidaColitas'; 
-    
-    const email = profile?.email || 'carlos.gonzalez@cuidacolitas.com';
-    const phone = profile?.phone_number || '+34 911 123 456';
-    const colegiado = profile?.college_id || 'COV-28-5678';
-    const address = profile?.address || 'Calle Veterinarios 123, Madrid';
-    const avatarUrl = profile?.avatar_url;
+  }, [userId, userEmail]);
 
+  useEffect(() => {
+    if (isFocused && userId) loadData();
+  }, [isFocused, userId, loadData]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const memberSince = useMemo(() => {
+    if (!profile?.created_at) return '—';
+    return new Date(profile.created_at).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+    });
+  }, [profile?.created_at]);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo cerrar sesión.');
+    }
+  };
+
+  if (loading && !profile) {
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.primary }}>
-            <ScrollView 
-                style={profileStyles.container}
-                contentContainerStyle={profileStyles.scrollContent}
-            >
-                {/* --- HEADER SUPERIOR --- */}
-                <View style={profileStyles.topHeader}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-                    </TouchableOpacity>
-                    <Text style={profileStyles.screenTitle}>Mi Perfil</Text>
-                    <View style={{ width: 24 }} />
-                </View>
-
-                {/* --- CABECERA DEL PERFIL (Dr. González) --- */}
-                <View style={profileStyles.profileHeader}>
-                    <View style={profileStyles.avatarCircle}>
-                        {avatarUrl ? (
-                            <Image source={{ uri: avatarUrl }} style={profileStyles.avatarImage} />
-                        ) : (
-                            <Ionicons name="bandage" size={40} color={COLORS.white} />
-                        )}
-                    </View>
-                    <Text style={profileStyles.nameTitle}>Dr. {vetName}</Text>
-                    <Text style={profileStyles.specialty}>{vetTitle}</Text>
-                    <Text style={profileStyles.clinic}>{clinicName}</Text>
-                </View>
-
-                {/* --- 1. Información Profesional --- */}
-                <View style={[profileStyles.card, { backgroundColor: COLORS.secondary }]}>
-                    <Text style={profileStyles.cardTitle}>Información Profesional</Text>
-                    <InfoRow icon="mail-outline" value={email} />
-                    <InfoRow icon="call-outline" value={phone} />
-                    <InfoRow icon="document-text-outline" value={colegiado} />
-                    <InfoRow icon="location-outline" value={address} />
-                </View>
-
-                {/* --- 2. Estadísticas de Hoy --- */}
-                <View style={profileStyles.sectionContainer}>
-                    <Text style={profileStyles.cardTitle}>Estadísticas de Hoy</Text>
-                    <View style={profileStyles.statsRow}>
-                        <View style={[profileStyles.statCard, { backgroundColor: COLORS.white }]}>
-                            <Text style={[profileStyles.statValue, { color: COLORS.primary }]}>{statsData.citas}</Text>
-                            <Text style={profileStyles.statLabel}>Citas</Text>
-                        </View>
-                        <View style={[profileStyles.statCard, { backgroundColor: COLORS.secondary }]}>
-                            <Text style={[profileStyles.statValue, { color: COLORS.primary }]}>{statsData.tratamiento}</Text>
-                            <Text style={profileStyles.statLabel}>En Tratamiento</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* --- 3. Pacientes Recientes --- */}
-                <View style={[profileStyles.card, { backgroundColor: COLORS.secondary }]}>
-                    <Text style={profileStyles.cardTitle}>Pacientes Recientes</Text>
-                    {recentPatients.map(p => (
-                        <PatientCard 
-                            key={p.id} 
-                            patientName={p.name} 
-                            ownerName={`Dueño: ${p.owner}`}
-                            petType={p.type} 
-                            status={p.status} 
-                        />
-                    ))}
-                </View>
-
-                {/* --- 4. Acciones --- */}
-                <TouchableOpacity 
-                    style={profileStyles.actionButton} 
-                    onPress={() => navigation.navigate('EditProfile', { profile: profile })}
-                >
-                    <Ionicons name="create-outline" size={20} color={COLORS.primary} style={{ marginRight: 10 }} />
-                    <Text style={profileStyles.actionButtonText}>Editar Perfil</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                    style={[profileStyles.actionButton, profileStyles.logoutButton]} 
-                    onPress={signOut}
-                >
-                    <Ionicons name="log-out-outline" size={20} color={COLORS.white} style={{ marginRight: 10 }} />
-                    <Text style={[profileStyles.actionButtonText, profileStyles.logoutButtonText]}>Cerrar Sesión</Text>
-                </TouchableOpacity>
-
-            </ScrollView>
-        </SafeAreaView>
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
     );
+  }
+
+  const placeholder = 'https://via.placeholder.com/100/43C0AF/013847?text=VET';
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.card]} tintColor={COLORS.card} />}
+    >
+      {/* Header */}
+      <Header name={profile?.name || 'Dr. González'} title={profile?.title || 'Médico General Veterinario'} />
+
+      {/* Card Perfil */}
+      <View style={styles.userCard}>
+        <Image
+          source={{ uri: avatarUrl || profile?.avatar_url || placeholder }} // 👈 usa avatarUrl del contexto
+          style={styles.avatar}
+        />
+        <Text style={styles.userName}>{profile?.name || 'Dr. González'}</Text>
+        <Text style={styles.userSubtitle}>
+          {profile?.title || 'Médico General Veterinario'} · {profile?.clinic || 'Clínica Veterinaria CuidaColitas'}
+        </Text>
+        <View style={{ flexDirection: 'row', marginTop: 8 }}>
+          <Pill bg={COLORS.lightGreen} color={COLORS.accent}>{profile?.role === 'cliente' ? 'Cliente' : 'Veterinario'}</Pill>
+          <View style={{ width: 8 }} />
+          <Pill bg={COLORS.lightBlue} color={COLORS.card}>Miembro desde {memberSince}</Pill>
+        </View>
+      </View>
+
+      {/* Información Profesional */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Información Profesional</Text>
+        <View style={styles.infoCard}>
+          <Row icon="mail-outline" label="Correo" value={profile?.email} />
+          <Row icon="call-outline" label="Teléfono" value={profile?.phone_number || '+34 911 123 456'} />
+          <Row icon="document-text-outline" label="Colegiado" value={profile?.college_id || 'COV-28-5678'} />
+          <Row icon="location-outline" label="Dirección" value={profile?.address || 'Calle Veterinarios 123, Madrid'} />
+        </View>
+      </View>
+
+      {/* Estadísticas de Hoy */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Estadísticas de Hoy</Text>
+        <View style={styles.statsGrid}>
+          <StatCard icon="calendar-outline" value={stats.todayAppointments} label="Citas" tone="blue" />
+          <StatCard icon="medkit-outline" value={stats.inTreatment} label="En Tratamiento" tone="green" />
+        </View>
+      </View>
+
+      {/* Pacientes Recientes */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Pacientes Recientes</Text>
+        <View style={styles.listCard}>
+          {(recentPatients || []).map(p => (
+            <View key={p.id} style={styles.patientItem}>
+              <View style={styles.patientIcon}>
+                <Ionicons name="paw-outline" size={18} color={COLORS.white} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.patientTitle}>{p.petName}</Text>
+                <Text style={styles.patientSub}>de {p.ownerName}</Text>
+              </View>
+              <Pill bg={COLORS.lightBlue} color={COLORS.card}>{p.tag}</Pill>
+            </View>
+          ))}
+          {(!recentPatients || recentPatients.length === 0) && (
+            <Text style={styles.emptyText}>Sin atenciones recientes.</Text>
+          )}
+        </View>
+      </View>
+
+      {/* Acciones */}
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={[styles.btn, styles.btnPrimary]}
+          onPress={() => navigation.navigate('EditProfile', { profile })}
+        >
+          <Ionicons name="create-outline" size={18} color={COLORS.white} />
+          <Text style={styles.btnText}>Editar Perfil</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={18} color={COLORS.white} />
+          <Text style={styles.btnText}>Cerrar Sesión</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ height: 24 }} />
+    </ScrollView>
+  );
 }
 
-// --- ESTILOS ---
+// ---------------------- Styles ----------------------
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.primary },
+  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.secondary },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
 
-const profileStyles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: COLORS.primary, // Fondo principal azul oscuro
-    },
-    loaderContainer: { 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: COLORS.primary,
-    },
-    scrollContent: {
-        paddingBottom: 40,
-    },
-    sectionContainer: {
-        marginHorizontal: 20, 
-        marginBottom: 20
-    },
-    
-    // --- Header Top ---
-    topHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-    },
-    screenTitle: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.h2,
-        color: COLORS.textPrimary,
-    },
+  headerContainer: { paddingVertical: 20 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  headerAvatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center',
+  },
+  headerName: { fontFamily: FONTS.PoppinsBold, fontSize: SIZES.h2, color: COLORS.textPrimary, lineHeight: 26 },
+  headerSubtitle: { fontFamily: FONTS.PoppinsRegular, fontSize: SIZES.caption, color: COLORS.textPrimary },
 
-    // --- Profile Header ---
-    profileHeader: {
-        alignItems: 'center',
-        paddingVertical: 20,
-        marginBottom: 20,
-        backgroundColor: COLORS.primary,
-    },
-    avatarCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: COLORS.accent, // Círculo verde agua
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-        borderWidth: 3,
-        borderColor: COLORS.secondary, 
-        overflow: 'hidden', // Para que la imagen no se salga del círculo
-    },
-    avatarImage: { // Estilo agregado para mostrar la foto de perfil
-        width: '100%',
-        height: '100%',
-    },
-    nameTitle: {
-        fontFamily: FONTS.PoppinsBold,
-        fontSize: SIZES.h2,
-        color: COLORS.textPrimary,
-        marginTop: 5,
-    },
-    specialty: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.h3,
-        color: COLORS.secondary,
-    },
-    clinic: {
-        fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.body,
-        color: COLORS.secondary,
-        opacity: 0.8,
-    },
-    
-    // --- Cards Generales ---
-    card: {
-        borderRadius: 16,
-        padding: 20,
-        marginHorizontal: 20,
-        marginBottom: 20,
-    },
-    cardTitle: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.h3,
-        color: COLORS.primary,
-        marginBottom: 15,
-    },
-    
-    // --- Información Profesional ---
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: `${COLORS.card}40`, 
-        paddingBottom: 12,
-    },
-    infoValue: {
-        fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.body,
-        color: COLORS.primary, 
-        flex: 1,
-    },
-    infoIcon: {
-        marginRight: 15,
-        width: 20, 
-    },
+  userCard: {
+    backgroundColor: COLORS.white, borderRadius: 12, padding: 20, alignItems: 'center',
+    shadowColor: COLORS.black, shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4, marginBottom: 24,
+  },
+  avatar: { width: 92, height: 92, borderRadius: 46, borderWidth: 3, borderColor: COLORS.card, marginBottom: 10 },
+  userName: { fontFamily: FONTS.PoppinsBold, fontSize: SIZES.h3, color: COLORS.primary },
+  userSubtitle: { fontFamily: FONTS.PoppinsRegular, fontSize: SIZES.body, color: COLORS.card },
 
-    // --- Estadísticas ---
-    statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 10,
-    },
-    statCard: {
-        width: '48%',
-        borderRadius: 12,
-        padding: 15,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: COLORS.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
-    },
-    statValue: {
-        fontFamily: FONTS.PoppinsBold,
-        fontSize: SIZES.h1,
-        marginBottom: 5,
-    },
-    statLabel: {
-        fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.body,
-        color: COLORS.card,
-    },
+  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  pillText: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.caption },
 
-    // --- Pacientes Recientes ---
-    patientItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.card,
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 10,
-    },
-    patientDetails: {
-        flex: 1,
-    },
-    patientName: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.body,
-        color: COLORS.textPrimary,
-    },
-    patientOwner: {
-        fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.caption,
-        color: COLORS.secondary,
-    },
-    statusBadge: {
-        borderRadius: 15,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        minWidth: 100,
-        alignItems: 'center',
-    },
-    statusBadgeText: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.caption,
-    },
+  section: { marginBottom: 22 },
+  sectionTitle: { fontFamily: FONTS.PoppinsBold, fontSize: SIZES.h3, color: COLORS.textPrimary, marginBottom: 10 },
 
-    // --- Botones de Acción ---
-    actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: COLORS.white,
-        borderRadius: 12,
-        paddingVertical: 15,
-        marginHorizontal: 20,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: COLORS.accent,
-    },
-    actionButtonText: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.h3,
-        color: COLORS.primary,
-    },
-    logoutButton: {
-        backgroundColor: COLORS.red,
-        borderColor: COLORS.red,
-    },
-    logoutButtonText: {
-        color: COLORS.white,
-    }
+  infoCard: {
+    backgroundColor: COLORS.white, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: COLORS.secondary,
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: COLORS.secondary,
+  },
+  rowLabel: { width: 110, marginLeft: 6, fontFamily: FONTS.PoppinsSemiBold, color: COLORS.primary, fontSize: SIZES.body },
+  rowValue: { flex: 1, textAlign: 'right', fontFamily: FONTS.PoppinsRegular, color: COLORS.card, fontSize: SIZES.body },
+
+  statsGrid: { flexDirection: 'row', gap: 12 },
+  statCard: {
+    flex: 1, borderRadius: 12, padding: 14, alignItems: 'flex-start',
+    borderWidth: 1, borderColor: COLORS.secondary,
+  },
+  statValue: { fontFamily: FONTS.PoppinsBold, fontSize: SIZES.h2, marginTop: 6 },
+  statLabel: { fontFamily: FONTS.PoppinsRegular, fontSize: SIZES.caption, marginTop: 2 },
+
+  listCard: {
+    backgroundColor: COLORS.white, borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: COLORS.secondary,
+  },
+  patientItem: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: COLORS.secondary,
+  },
+  patientIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  patientTitle: { fontFamily: FONTS.PoppinsSemiBold, color: COLORS.primary, fontSize: SIZES.body },
+  patientSub: { fontFamily: FONTS.PoppinsRegular, color: COLORS.card, fontSize: SIZES.caption },
+  emptyText: { textAlign: 'center', paddingVertical: 12, color: COLORS.card, fontFamily: FONTS.PoppinsRegular },
+
+  actionsRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
+  btn: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  btnPrimary: { backgroundColor: COLORS.card },
+  btnDanger: { backgroundColor: COLORS.red },
+  btnText: { color: COLORS.white, fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.body },
 });
