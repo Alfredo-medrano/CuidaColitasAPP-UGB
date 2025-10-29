@@ -1,3 +1,4 @@
+// src/screens/Auth/signup.js
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { supabase } from '../../api/Supabase.js';
@@ -39,21 +40,25 @@ export default function SignUp({ navigation, route }) {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error("No se pudo crear el usuario en el sistema de autenticación.");
 
+      // --- ESTA CONSULTA AHORA FUNCIONARÁ ---
+      // 1. Busca el rol 'cliente' (la lógica correcta para un registro público)
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
         .select('id')
-        .eq('name', 'veterinario')
+        .eq('name', 'cliente') // Corregido: busca 'cliente'
         .single();
 
-      if (roleError || !roleData) throw new Error("Error al obtener el rol de cliente. Por favor, contacta al soporte.");
+      if (roleError || !roleData) throw new Error("Error al obtener el rol de cliente. (¿Habilitaste la política de lectura RLS para 'roles'?)");
 
+      // 2. Inserta el perfil con el 'name' y 'role_id' correctos
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({
           id: authData.user.id,
-          name: name,
+          name: name, // Tu script SQL usa 'name'
           role_id: roleData.id,
         });
+      // --- FIN DE LA LÓGICA ---
 
       if (insertError) throw insertError;
 
@@ -65,7 +70,7 @@ export default function SignUp({ navigation, route }) {
       if (msg.includes("already registered")) {
         setError('Ese correo ya está registrado. Inicia sesión.');
       } else {
-        setError('Ocurrió un error inesperado. Por favor, intenta de nuevo.');
+        setError(err.message);
       }
     } finally {
       setLoading(false);
@@ -78,7 +83,7 @@ export default function SignUp({ navigation, route }) {
       onTabChange={(t) => navigation.replace(t === 'login' ? 'SignIn' : 'SignUp', { prefillEmail: normalize(email) })}
       title="Welcome to CuidaColitas"
     >
-      {/* ... el resto del JSX se mantiene igual ... */}
+      {/* ... El resto de tu JSX ... */}
       <UnderlineInput
         placeholder="Nombre Completo"
         value={name}

@@ -40,6 +40,7 @@ import ReprogramarCita from './src/screens/Client/ReprogramarCita';
 import MisMascotas from './src/screens/Client/MisMascotas';
 import HistorialMedicoC from './src/screens/Client/HistorialMedicoC';
 import DetalleCita from './src/components/DetalleCita';
+import AdminHome from './src/screens/admin/AdminHome';
 
 const Stack = createNativeStackNavigator();
 
@@ -61,7 +62,6 @@ function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
       <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
-      {/* ...el resto de tus pantallas de la app... */}
       <Stack.Screen name="ClienteHome" component={ClienteHome} options={{ headerShown: false }} />
       <Stack.Screen name="ProfileCliente" component={ProfileCliente} options={{ headerShown: false }}/>
       <Stack.Screen name="EditProfileClient" component={EditProfileClient} options={{ headerShown: false }} />
@@ -85,6 +85,8 @@ function AppStack() {
       <Stack.Screen name="NuevaVacuna" component={NuevaVacuna} options={{ title: 'Nueva Vacuna' }} />
       <Stack.Screen name="NuevoMedicamento" component={NuevoMedicamento} options={{ title: 'Nuevo Medicamento' }} />
       <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
+      <Stack.Screen name="AdminHome" component={AdminHome} options={{ headerShown: false }} />
+
     </Stack.Navigator>
   );
 }
