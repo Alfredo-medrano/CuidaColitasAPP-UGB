@@ -9,12 +9,13 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/Supabase';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-const PROFILE_TABLE = 'profiles'; // cámbialo si tu tabla difiere
+const PROFILE_TABLE = 'profiles';
 
 /* ---------- Subcomponentes ---------- */
 const IconBadge = ({ name, bg, color = COLORS.white }) => (
@@ -40,8 +41,17 @@ const SummaryCard = ({ left, right }) => (
   </View>
 );
 
+// --- Componente para el Footer ---
+const QuickActionButton = ({ icon, text, onPress }) => (
+  <TouchableOpacity style={styles.actionButton} onPress={onPress}>
+    <MaterialCommunityIcons name={icon} size={24} color={COLORS.primary} />
+    <Text style={styles.actionButtonText}>{text}</Text>
+  </TouchableOpacity>
+);
+
+
 /* ---------- Pantalla ---------- */
-const AdminHome = () => {
+const AdminHome = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [vetCount, setVetCount] = useState(0);
@@ -109,6 +119,15 @@ const AdminHome = () => {
             <Text style={styles.headerTitle}>VetAdmin Pro</Text>
             <Text style={styles.headerSubtitle}>Panel de Administración</Text>
           </View>
+          
+          {/* Botón de perfil (en el header) */}
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('AdminProfile')}
+          >
+            <MaterialCommunityIcons name="account-circle-outline" size={28} color={COLORS.white} />
+          </TouchableOpacity>
+
         </View>
       </View>
 
@@ -143,7 +162,6 @@ const AdminHome = () => {
           left="Total Usuarios"
           right={<Text style={styles.summaryValue}>{loading ? '—' : totalUsers}</Text>}
         />
-
         <SummaryCard
           left="Estado Sistema"
           right={
@@ -160,18 +178,38 @@ const AdminHome = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* --- FOOTER DE ACCIONES RÁPIDAS --- */}
+      <View style={styles.footer}>
+        <View style={styles.actionButtonsContainer}>
+          <QuickActionButton
+            icon="stethoscope"
+            text="Vets"
+            onPress={() => navigation.navigate('Vets')}
+          />
+          <QuickActionButton
+            icon="account-group-outline"
+            text="Clientes"
+            onPress={() => navigation.navigate('Clients')}
+          />
+          <QuickActionButton
+            icon="chart-line"
+            text="Stats"
+            onPress={() => navigation.navigate('Stats')}
+          />
+        </View>
+      </View>
     </SafeAreaView>
   );
 };
 
-/* ---------- Estilos (theme.js) ---------- */
+/* ---------- Estilos (Corregidos) ---------- */
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.primary },
   header: {
     backgroundColor: COLORS.card,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerLogo: {
@@ -192,7 +230,14 @@ const styles = StyleSheet.create({
     marginTop: -2,
     opacity: 0.95,
   },
-  container: { padding: 12, paddingBottom: 28 },
+  profileButton: {
+    padding: 6,
+    marginLeft: 'auto',
+  },
+  container: { 
+    padding: 12, 
+    paddingBottom: 100 
+  },
   sectionTitle: {
     fontSize: SIZES.h2,
     fontFamily: FONTS.PoppinsBold,
@@ -205,8 +250,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 10,
   },
-
-  /* Cards */
   cardRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -241,8 +284,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.PoppinsBold,
     marginTop: 2,
   },
-
-  /* Resumen */
   summaryCard: {
     backgroundColor: COLORS.white,
     paddingVertical: 14,
@@ -265,8 +306,6 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontFamily: FONTS.PoppinsBold,
   },
-
-  /* Estado */
   statusDot: {
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: COLORS.accent,
@@ -277,6 +316,45 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontFamily: FONTS.PoppinsSemiBold,
   },
+
+  // --- Estilos del Footer ---
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.white,
+    paddingTop: 8,
+    paddingBottom: 25, 
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+    paddingHorizontal: 10,
+  },
+  actionButton: {
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    flex: 1, 
+    minHeight: 55,
+  },
+  actionButtonText: {
+    fontFamily: FONTS.PoppinsRegular,
+    fontSize: 11,
+    color: COLORS.black,
+    marginTop: 4,
+  }
 });
 
 export default AdminHome;
