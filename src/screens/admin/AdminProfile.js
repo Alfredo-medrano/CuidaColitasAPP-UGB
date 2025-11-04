@@ -1,4 +1,3 @@
-// src/screens/admin/AdminProfile.js
 import React from 'react';
 import {
   View,
@@ -65,14 +64,12 @@ const AdminProfile = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       <View style={styles.container}>
-        
-        {/* Caja de información del usuario */}
+  
         <View style={styles.infoBox}>
           <Text style={styles.infoLabel}>Cuenta de Administrador</Text>
           <Text style={styles.infoEmail}>{user?.email || 'Cargando...'}</Text>
         </View>
 
-        {/* Botones de acción */}
         <ProfileButton
           icon="account-edit-outline"
           text="Editar Información"

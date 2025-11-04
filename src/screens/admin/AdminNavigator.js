@@ -7,15 +7,12 @@ import { COLORS, FONTS } from '../../theme/theme'; // Ajusta la ruta a tu theme
 // Pantallas principales
 import AdminHome from './AdminHome';
 import AdminProfile from './AdminProfile';
+import GestionVets from './GestionVets'; //
 
 const Stack = createStackNavigator();
 
-/* Pantallas de relleno */
-const VetsScreen = () => (
-  <View style={styles.placeholderContainer}>
-    <Text style={styles.placeholderText}>Pantalla de Veterinarios (WIP)</Text>
-  </View>
-);
+
+
 const ClientsScreen = () => (
   <View style={styles.placeholderContainer}>
     <Text style={styles.placeholderText}>Pantalla de Clientes (WIP)</Text>
@@ -46,24 +43,26 @@ export default function AdminNavigator() {
         headerBackTitleVisible: false,
       }}
     >
-      {/* 2. AdminHome sin header propio */}
+
       <Stack.Screen
         name="AdminHome"
         component={AdminHome}
         options={{ headerShown: false }}
       />
       
-      {/* 3. El resto de pantallas con header */}
       <Stack.Screen
         name="AdminProfile"
-        component={AdminProfile} // <-- 3. ¡Ahora está registrado!
+        component={AdminProfile}
         options={{ title: 'Mi Perfil' }}
       />
+
+   
       <Stack.Screen
         name="Vets"
-        component={VetsScreen}
-        options={{ title: 'Gestionar Veterinarios' }}
+        component={GestionVets} 
+        options={{ headerShown: false }} 
       />
+
       <Stack.Screen
         name="Clients"
         component={ClientsScreen}
@@ -78,7 +77,6 @@ export default function AdminNavigator() {
   );
 }
 
-// Estilos para las pantallas de relleno
 const styles = StyleSheet.create({
   placeholderContainer: {
     flex: 1,

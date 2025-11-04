@@ -41,10 +41,12 @@ import MisMascotas from './src/screens/Client/MisMascotas';
 import HistorialMedicoC from './src/screens/Client/HistorialMedicoC';
 import DetalleCita from './src/components/DetalleCita';
 import AdminHome from './src/screens/admin/AdminHome';
+import AdminProfile from './src/screens/admin/AdminProfile';
+import GestionVets from './src/screens/admin/GestionVets';
 
 const Stack = createNativeStackNavigator();
 
-// --- Pilas de navegación (sin cambios) ---
+// navegacion de autenticacion
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -56,9 +58,8 @@ function AuthStack() {
   );
 }
 
+// navegacion principal de la app
 function AppStack() {
-  // Aquí podrías usar el hook useAuth() para obtener el rol del perfil
-  // y decidir qué pantalla mostrar primero si fuera necesario.
   return (
     <Stack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
       <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
@@ -86,12 +87,13 @@ function AppStack() {
       <Stack.Screen name="NuevoMedicamento" component={NuevoMedicamento} options={{ title: 'Nuevo Medicamento' }} />
       <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
       <Stack.Screen name="AdminHome" component={AdminHome} options={{ headerShown: false }} />
-
+      <Stack.Screen name="AdminProfile" component={AdminProfile} options={{ title: 'Mi Perfil' }} />
+      <Stack.Screen name="Vets" component={GestionVets} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
 
-// --- Componente que decide qué navegación mostrar ---
+//aqui se decide que stack mostrar
 function RootNavigator() {
   const { session, loading } = useAuth();
   const [fontsLoaded] = useFonts({
@@ -115,7 +117,6 @@ function RootNavigator() {
   );
 }
 
-// --- Componente principal de la App ---
 export default function App() {
   return (
     <AuthProvider>
