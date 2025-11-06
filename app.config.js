@@ -1,4 +1,10 @@
-{
+import 'dotenv/config'; 
+
+const getUpdatesUrl = () => {
+  return "https://u.expo.dev/c15b9c5a-73d2-4e4b-a275-c9c049d5c414"; 
+};
+
+export default {
   "expo": {
     "name": "Supabase",
     "slug": "Supabase",
@@ -31,8 +37,8 @@
       "favicon": "./src/assets/banner.png"
     },
     "extra": {
-      "supabaseUrl": null,
-      "supabaseAnonKey": null
+      "supabaseUrl": process.env.SUPABASE_URL,
+      "supabaseAnonKey": process.env.SUPABASE_ANON_KEY 
     },
     "plugins": [
       [
@@ -44,7 +50,7 @@
       "expo-font"
     ],
     "updates": {
-      "url": "https://u.expo.dev/c15b9c5a-73d2-4e4b-a275-c9c049d5c414"
+      "url": getUpdatesUrl()
     }
   }
-}
+};
