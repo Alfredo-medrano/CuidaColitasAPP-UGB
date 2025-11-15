@@ -1,7 +1,7 @@
-import 'dotenv/config'; 
+import 'dotenv/config';
 
 const getUpdatesUrl = () => {
-  return "https://u.expo.dev/c15b9c5a-73d2-4e4b-a275-c9c049d5c414"; 
+  return "https://u.expo.dev/c15b9c5a-73d2-4e4b-a275-c9c049d5c414";
 };
 
 export default {
@@ -38,7 +38,10 @@ export default {
     },
     "extra": {
       "supabaseUrl": process.env.SUPABASE_URL,
-      "supabaseAnonKey": process.env.SUPABASE_ANON_KEY 
+      "supabaseAnonKey": process.env.SUPABASE_ANON_KEY,
+      "eas": {
+        projectId: "7824a741-b330-4397-a258-20917c7e80d9"
+      }
     },
     "plugins": [
       [
