@@ -1,4 +1,3 @@
-// src/screens/Client/MisCitas.js
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, StatusBar } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -10,7 +9,6 @@ import 'moment/locale/es';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import { useAppointments } from '../../hooks/useAppointments';
 
-// Configuración del idioma del calendario a español
 LocaleConfig.locales['es'] = {
   monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
   monthNamesShort: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
