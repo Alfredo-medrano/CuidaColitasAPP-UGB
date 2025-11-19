@@ -1,5 +1,4 @@
-// src/screens/Chat/ChatScreen.js
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
 import {
     View,
     Text,
@@ -7,247 +6,543 @@ import {
     TouchableOpacity,
     FlatList,
     StyleSheet,
-    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
+    Modal,
+    Alert,
     SafeAreaView,
+    StatusBar
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { supabase } from '../../api/Supabase'; //
-import { useAuth } from '../../context/AuthContext'; //
-import { COLORS, FONTS, SIZES } from '../../theme/theme'; //
 import { Ionicons } from '@expo/vector-icons';
+import moment from 'moment';
+import 'moment/locale/es';
 
-// Componente para una burbuja de mensaje individual
-const MessageBubble = ({ message, isCurrentUser }) => {
-    return (
-        <View
-            style={[
-                styles.messageContainer,
-                isCurrentUser ? styles.currentUserMessageContainer : styles.otherUserMessageContainer,
-            ]}
-        >
-            <View
-                style={[
-                    styles.messageBubble,
-                    isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
-                ]}
-            >
-                <Text style={isCurrentUser ? styles.currentUserText : styles.otherUserText}>
-                    {message.content}
-                </Text>
-            </View>
-            <Text style={styles.timeText}>
-                {new Date(message.created_at).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-        </View>
-    );
-};
+// --- IMPORTACIONES ---
+import { supabase } from '../../api/Supabase';
+import { useAuth } from '../../context/AuthContext';
+import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-export default function ChatScreen() {
-    const route = useRoute();
-    const { session } = useAuth();
-    const { conversation_id } = route.params;
+export default function ChatScreen({ route, navigation }) {
+    // Parámetros
+    const { conversation_id, other_user_id, other_user_name } = route.params || {};
+    const { user } = useAuth();
 
+    // Estados
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
-    const flatListRef = useRef(null);
 
-    const userId = session?.user?.id;
+    // Modal Mascotas
+    const [showPetsModal, setShowPetsModal] = useState(false);
+    const [otherUserPets, setOtherUserPets] = useState([]);
+    const [loadingPets, setLoadingPets] = useState(false);
 
-    // 1. Cargar los mensajes iniciales
-    const fetchMessages = async () => {
+    const flatListRef = useRef();
+
+    // ------------------------------------------------------------------
+    // 1. HEADER PERSONALIZADO
+    // ------------------------------------------------------------------
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            title: other_user_name || 'Chat',
+            headerStyle: { backgroundColor: COLORS.primary, elevation: 0, shadowOpacity: 0 },
+            headerTintColor: COLORS.white,
+            headerTitleStyle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: 18 },
+            headerRight: () => (
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.headerPetButton}
+                    onPress={() => {
+                        if (!other_user_id) {
+                            Alert.alert("Ups", "No se pudo identificar al usuario para ver sus mascotas.");
+                            return;
+                        }
+                        setShowPetsModal(true);
+                        fetchOtherUserPets();
+                    }}
+                >
+                    <Ionicons name="paw" size={18} color={COLORS.primary} />
+                    <Text style={styles.headerPetButtonText}>Mascotas</Text>
+                </TouchableOpacity>
+            ),
+        });
+    }, [navigation, other_user_name, other_user_id]);
+
+    // ------------------------------------------------------------------
+    // 2. LOGICA REALTIME
+    // ------------------------------------------------------------------
+    useEffect(() => {
         if (!conversation_id) return;
-        setLoading(true);
+
+        fetchMessages();
+
+        const channel = supabase
+            .channel(`chat_room:${conversation_id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversation_id}` },
+                (payload) => {
+                    if (payload.eventType === 'INSERT') handleNewMessageRealtime(payload.new);
+                    else if (payload.eventType === 'UPDATE') handleMessageUpdateRealtime(payload.new);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+            markAsRead();
+        };
+    }, [conversation_id]);
+
+    const handleNewMessageRealtime = async (newMsg) => {
+        setMessages((prev) => [...prev, newMsg]);
+        if (newMsg.sender_id !== user.id) {
+            await supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id);
+        }
+    };
+
+    const handleMessageUpdateRealtime = (updatedMsg) => {
+        setMessages((prev) => prev.map((msg) => (msg.id === updatedMsg.id ? updatedMsg : msg)));
+    };
+
+    // ------------------------------------------------------------------
+    // 3. FUNCIONES DE DATOS
+    // ------------------------------------------------------------------
+    const fetchMessages = async () => {
         const { data, error } = await supabase
             .from('messages')
             .select('*')
             .eq('conversation_id', conversation_id)
             .order('created_at', { ascending: true });
 
-        if (error) {
-            console.error('Error fetching messages:', error.message);
-        } else {
+        if (!error) {
             setMessages(data);
+            markAsRead();
         }
         setLoading(false);
     };
 
-    // 2. Enviar un nuevo mensaje
-    const handleSend = async () => {
-        if (newMessage.trim() === '' || !userId || !conversation_id) {
-            return;
-        }
-
-        const messageToSend = {
-            conversation_id: conversation_id,
-            sender_id: userId,
-            content: newMessage.trim(),
-        };
-
-        // Limpiamos el input inmediatamente para una UI rápida
-        setNewMessage('');
-
-        // Insertamos el mensaje en Supabase
-        const { error } = await supabase.from('messages').insert(messageToSend);
-        if (error) {
-            console.error('Error sending message:', error.message);
-            // Si falla, podríamos re-setear el input
-            setNewMessage(messageToSend.content);
-        }
-        // No necesitamos añadir el mensaje al estado aquí, 
-        // ¡la suscripción de Realtime lo hará por nosotros!
+    const markAsRead = async () => {
+        if (!conversation_id || !user?.id) return;
+        await supabase
+            .from('messages')
+            .update({ is_read: true })
+            .eq('conversation_id', conversation_id)
+            .neq('sender_id', user.id)
+            .is('is_read', false);
     };
 
-    // Efecto para cargar mensajes al abrir la pantalla
-    useEffect(() => {
-        fetchMessages();
-    }, [conversation_id]);
+    const fetchOtherUserPets = async () => {
+        if (!other_user_id) return;
+        setLoadingPets(true);
+        const { data, error } = await supabase.from('pets').select('*').eq('owner_id', other_user_id);
+        if (!error) setOtherUserPets(data || []);
+        setLoadingPets(false);
+    };
 
-    // 3. Suscripción a Realtime para nuevos mensajes
-    useEffect(() => {
-        if (!conversation_id) return;
+    const handleSend = async () => {
+        if (!newMessage.trim() || !conversation_id) return;
+        const msgText = newMessage.trim();
+        setNewMessage('');
+        try {
+            await supabase.from('messages').insert({
+                conversation_id: conversation_id,
+                sender_id: user.id,
+                content: msgText,
+                is_read: false,
+            });
+        } catch (error) {
+            console.error('Error enviando:', error.message);
+        }
+    };
 
-        // Escuchamos por INSERTS en la tabla 'messages'
-        const channel = supabase
-            .channel(`public:messages:conversation_id=eq.${conversation_id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `conversation_id=eq.${conversation_id}`,
-                },
-                (payload) => {
-                    // Cuando llega un nuevo mensaje, lo añadimos al estado
-                    setMessages((prevMessages) => [...prevMessages, payload.new]);
-                }
-            )
-            .subscribe();
+    const calculateAge = (birthDate) => {
+        if (!birthDate) return 'Edad desconocida';
+        const years = moment().diff(moment(birthDate), 'years');
+        return years === 0 ? 'Menos de 1 año' : `${years} años`;
+    };
 
-        // Limpiamos la suscripción al salir
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [conversation_id]);
+    // ------------------------------------------------------------------
+    // 4. RENDERIZADO
+    // ------------------------------------------------------------------
+    const renderMessageItem = ({ item, index }) => {
+        const isMyMessage = item.sender_id === user.id;
 
-    if (loading) {
-        return <ActivityIndicator style={styles.centered} size="large" color={COLORS.primary} />;
-    }
+        // Lógica para agrupar mensajes visualmente (opcional)
+        const isNextMessageMine = messages[index + 1]?.sender_id === item.sender_id;
+
+        return (
+            <View style={[
+                styles.messageBubble,
+                isMyMessage ? styles.myBubble : styles.otherBubble,
+                // Ajuste de bordes si hay mensajes consecutivos
+                isMyMessage && isNextMessageMine ? { borderBottomRightRadius: 4 } : {},
+                !isMyMessage && isNextMessageMine ? { borderBottomLeftRadius: 4 } : {}
+            ]}>
+                <Text style={[styles.msgText, isMyMessage ? styles.myMsgText : styles.otherMsgText]}>
+                    {item.content}
+                </Text>
+
+                <View style={styles.metaData}>
+                    <Text style={[styles.timeText, isMyMessage ? { color: 'rgba(255,255,255,0.7)' } : { color: COLORS.gray }]}>
+                        {moment(item.created_at).format('h:mm a')}
+                    </Text>
+                    {isMyMessage && (
+                        <View style={{ marginLeft: 4 }}>
+                            <Ionicons
+                                name={item.is_read ? "checkmark-done-all" : "checkmark"}
+                                size={16}
+                                color={item.is_read ? COLORS.secondary : 'rgba(255,255,255,0.6)'}
+                            />
+                        </View>
+                    )}
+                </View>
+            </View>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                style={styles.container}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-            >
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+
+            {loading ? (
+                <View style={styles.centerLoader}>
+                    <ActivityIndicator size="large" color={COLORS.card} />
+                </View>
+            ) : (
                 <FlatList
                     ref={flatListRef}
                     data={messages}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                        <MessageBubble message={item} isCurrentUser={item.sender_id === userId} />
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderMessageItem}
+                    contentContainerStyle={styles.listContent}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                    ListEmptyComponent={() => (
+                        <View style={styles.emptyContainer}>
+                            <View style={styles.emptyIconBg}>
+                                <Ionicons name="chatbubbles-outline" size={40} color={COLORS.white} />
+                            </View>
+                            <Text style={styles.emptyText}>¡Saluda a {other_user_name}!</Text>
+                            <Text style={styles.emptySubText}>Comienza la conversación hoy.</Text>
+                        </View>
                     )}
-                    contentContainerStyle={styles.messageList}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                 />
+            )}
 
+            {/* INPUT AREA */}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+            >
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.textInput}
+                        placeholder="Escribe un mensaje..."
+                        placeholderTextColor="#999"
                         value={newMessage}
                         onChangeText={setNewMessage}
-                        placeholder="Escribe un mensaje..."
-                        placeholderTextColor={COLORS.textSecondary}
+                        multiline
+                        maxLength={500}
                     />
-                    <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-                        <Ionicons name="send" size={24} color={COLORS.white} />
+                    <TouchableOpacity
+                        onPress={handleSend}
+                        style={[styles.sendBtn, !newMessage.trim() && styles.sendBtnDisabled]}
+                        disabled={!newMessage.trim()}
+                    >
+                        <Ionicons name="send" size={20} color={COLORS.white} style={{ marginLeft: 2 }} />
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* MODAL MASCOTAS */}
+            <Modal
+                visible={showPetsModal}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowPetsModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Mascotas de {other_user_name}</Text>
+                            <TouchableOpacity onPress={() => setShowPetsModal(false)} style={styles.closeButton}>
+                                <Ionicons name="close" size={20} color={COLORS.primary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {loadingPets ? (
+                            <ActivityIndicator color={COLORS.card} style={{ padding: 20 }} />
+                        ) : otherUserPets.length > 0 ? (
+                            <FlatList
+                                data={otherUserPets}
+                                keyExtractor={(item) => item.id.toString()}
+                                renderItem={({ item }) => (
+                                    <View style={styles.petCard}>
+                                        <View style={styles.petIconBox}>
+                                            <Ionicons name="paw" size={22} color={COLORS.card} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.petName}>{item.name}</Text>
+                                            <Text style={styles.petDetail}>
+                                                {item.breed || 'Raza desconocida'} • {calculateAge(item.birth_date)}
+                                            </Text>
+                                        </View>
+                                        {/* Badge de estado */}
+                                        <View style={[
+                                            styles.petStatusBadge,
+                                            { backgroundColor: item.status === 'Activo' ? COLORS.lightGreen : COLORS.lightRed }
+                                        ]}>
+                                            <Text style={[
+                                                styles.petStatusText,
+                                                { color: item.status === 'Activo' ? COLORS.card : COLORS.red }
+                                            ]}>
+                                                {item.status || 'N/A'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                            />
+                        ) : (
+                            <View style={styles.emptyPetsContainer}>
+                                <Ionicons name="paw-outline" size={40} color={COLORS.gray} />
+                                <Text style={styles.emptyPetsText}>Sin mascotas registradas</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
 
-// === ESTILOS ===
+// --- ESTILOS ---
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.white,
+        backgroundColor: '#F4F6F8', // Fondo claro moderno
     },
-    centered: {
+    centerLoader: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    messageList: {
-        paddingHorizontal: SIZES.padding,
-        paddingVertical: SIZES.padding,
+    listContent: {
+        paddingHorizontal: 15,
+        paddingVertical: 20,
     },
-    messageContainer: {
-        marginVertical: 4,
-    },
-    currentUserMessageContainer: {
-        alignItems: 'flex-end',
-    },
-    otherUserMessageContainer: {
-        alignItems: 'flex-start',
-    },
+
+    // BURBUJAS CHAT
     messageBubble: {
-        maxWidth: '75%',
-        padding: SIZES.radius,
-        borderRadius: SIZES.radius,
+        maxWidth: '82%',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 18,
+        marginBottom: 4,
+        elevation: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 1,
     },
-    currentUserBubble: {
-        backgroundColor: COLORS.primary,
-        borderBottomRightRadius: SIZES.base,
+    myBubble: {
+        alignSelf: 'flex-end',
+        backgroundColor: COLORS.card, // Usamos el color "Card" (Teal) para mis mensajes
+        borderBottomRightRadius: 2, // Efecto burbuja
     },
-    otherUserBubble: {
-        backgroundColor: COLORS.lightGray, // Color para el otro usuario
-        borderBottomLeftRadius: SIZES.base,
+    otherBubble: {
+        alignSelf: 'flex-start',
+        backgroundColor: COLORS.white,
+        borderBottomLeftRadius: 2, // Efecto burbuja
+        borderWidth: 1,
+        borderColor: '#EEE',
     },
-    currentUserText: {
-        color: COLORS.white,
+    msgText: {
+        fontSize: 15,
         fontFamily: FONTS.PoppinsRegular,
+        lineHeight: 22,
     },
-    otherUserText: {
-        color: COLORS.textPrimary,
-        fontFamily: FONTS.PoppinsRegular,
+    myMsgText: { color: COLORS.white },
+    otherMsgText: { color: '#333' },
+
+    metaData: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 2,
     },
     timeText: {
-        fontFamily: FONTS.PoppinsRegular,
         fontSize: 10,
-        color: COLORS.textSecondary,
+        fontFamily: FONTS.PoppinsRegular,
         marginTop: 2,
-        marginHorizontal: 4
     },
+
+    // ESTADO VACÍO
+    emptyContainer: {
+        alignItems: 'center',
+        marginTop: 80,
+        opacity: 0.8,
+    },
+    emptyIconBg: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: COLORS.secondary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    emptyText: {
+        fontFamily: FONTS.PoppinsBold,
+        fontSize: 18,
+        color: COLORS.primary,
+    },
+    emptySubText: {
+        fontFamily: FONTS.PoppinsRegular,
+        fontSize: 14,
+        color: COLORS.gray,
+        marginTop: 5,
+    },
+
+    // INPUT AREA
     inputContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        padding: SIZES.radius,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.lightGray,
+        alignItems: 'flex-end',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         backgroundColor: COLORS.white,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 5,
     },
     textInput: {
         flex: 1,
-        height: 40,
-        backgroundColor: COLORS.lightGray,
-        borderRadius: 20,
-        paddingHorizontal: SIZES.padding,
+        backgroundColor: '#F5F7FA',
+        borderRadius: 24,
+        paddingHorizontal: 18,
+        paddingTop: 12,
+        paddingBottom: 12,
         fontFamily: FONTS.PoppinsRegular,
+        fontSize: 15,
+        marginRight: 10,
+        maxHeight: 100, // Crece hasta cierto punto
+        color: COLORS.black,
     },
-    sendButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.primary,
+    sendBtn: {
+        backgroundColor: COLORS.accent,
+        width: 46,
+        height: 46,
+        borderRadius: 23,
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: SIZES.radius,
+        marginBottom: 1, // Alinear con input si es multilínea
+        elevation: 2,
+    },
+    sendBtnDisabled: {
+        backgroundColor: '#CCC',
+        elevation: 0,
+    },
+
+    // HEADER BUTTON
+    headerPetButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.secondary,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        marginRight: 5,
+    },
+    headerPetButtonText: {
+        fontFamily: FONTS.PoppinsSemiBold,
+        fontSize: 12,
+        color: COLORS.primary,
+        marginLeft: 6,
+    },
+
+    // MODAL
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end', // Bottom sheet style
+    },
+    modalContent: {
+        backgroundColor: COLORS.white,
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        padding: 20,
+        maxHeight: '70%',
+        minHeight: '30%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontFamily: FONTS.PoppinsBold,
+        color: COLORS.primary,
+    },
+    closeButton: {
+        padding: 5,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 15,
+    },
+    petCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#FAFAFA',
+        borderRadius: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
+    },
+    petIconBox: {
+        width: 45,
+        height: 45,
+        borderRadius: 22.5,
+        backgroundColor: COLORS.secondary + '40', // Transparencia
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    petName: {
+        fontSize: 16,
+        fontFamily: FONTS.PoppinsSemiBold,
+        color: COLORS.primary,
+    },
+    petDetail: {
+        fontSize: 12,
+        fontFamily: FONTS.PoppinsRegular,
+        color: '#666',
+    },
+    petStatusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    petStatusText: {
+        fontSize: 10,
+        fontFamily: FONTS.PoppinsBold,
+    },
+    emptyPetsContainer: {
+        alignItems: 'center',
+        paddingVertical: 30,
+    },
+    emptyPetsText: {
+        marginTop: 10,
+        fontFamily: FONTS.PoppinsRegular,
+        color: '#999',
     },
 });
