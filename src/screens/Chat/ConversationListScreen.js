@@ -1,97 +1,156 @@
-// src/screens/Chat/ConversationListScreen.js
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+    View,
+    Text,
+    FlatList,
+    TouchableOpacity,
+    StyleSheet,
+    ActivityIndicator,
+    RefreshControl,
+    TextInput,
+    StatusBar
+} from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { supabase } from '../../api/Supabase'; // [cite: uploaded:alfredo-medrano/cuidacolitasapp-ugb/CuidaColitasAPP-UGB-feeb023817b54d78f80034865c5fbb3492e0b009/src/api/Supabase.js]
-import { useAuth } from '../../context/AuthContext'; // [cite: uploaded:alfredo-medrano/cuidacolitasapp-ugb/CuidaColitasAPP-UGB-feeb023817b54d78f80034865c5fbb3492e0b009/src/context/AuthContext.js]
-import { COLORS, FONTS, SIZES } from '../../theme/theme'; // [cite: uploaded:alfredo-medrano/cuidacolitasapp-ugb/CuidaColitasAPP-UGB-feeb023817b54d78f80034865c5fbb3492e0b009/src/theme/theme.js]
+import { Ionicons } from '@expo/vector-icons';
+import moment from 'moment';
+import 'moment/locale/es';
 
-// Un componente simple para mostrar cada conversación en la lista
+import { supabase } from '../../api/Supabase';
+import { useAuth } from '../../context/AuthContext';
+import { COLORS, FONTS, SIZES } from '../../theme/theme';
+
+// Componente para el Avatar (Iniciales o Imagen)
+const Avatar = ({ name }) => {
+    const initial = name ? name.charAt(0).toUpperCase() : '?';
+    return (
+        <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+    );
+};
+
+// Item de la lista (Tarjeta de Conversación)
 const ConversationItem = ({ item, currentUserId }) => {
     const navigation = useNavigation();
 
-    // Determina quién es la "otra" persona en el chat
-    // Asegurándonos que otherUser no sea null
+    // Identificar al otro usuario
     const otherUser = item.client_id?.id === currentUserId ? item.vet_id : item.client_id;
 
-    // Si por alguna razón el otro usuario no carga, no mostramos el item
-    if (!otherUser) {
-        return null;
-    }
+    if (!otherUser) return null;
 
-    // Función para navegar a la pantalla de chat
+    // Lógica de "No Leído": 
+    // Si el último mensaje NO fue leído Y NO fui yo quien lo envió.
+    const isUnread = !item.last_message_is_read && item.last_message_sender_id !== currentUserId;
+
     const goToChat = () => {
         navigation.navigate('ChatScreen', {
             conversation_id: item.id,
             other_user_name: otherUser.name,
+            other_user_id: otherUser.id,
         });
     };
 
+    // Formatear fecha (ej: "10:30 AM" o "Ayer")
+    const formatTime = (dateString) => {
+        if (!dateString) return '';
+        const date = moment(dateString);
+        if (date.isSame(moment(), 'day')) return date.format('LT'); // 10:30 AM
+        if (date.isSame(moment().subtract(1, 'days'), 'day')) return 'Ayer';
+        return date.format('DD/MM/YY');
+    };
+
     return (
-        <TouchableOpacity style={styles.chatItem} onPress={goToChat}>
-            <View style={styles.avatar}>
-                {/* Aquí puedes poner la imagen de avatar si la tienes */}
-                <Text style={styles.avatarText}>{otherUser.name ? otherUser.name.charAt(0) : '?'}</Text>
+        <TouchableOpacity
+            style={[styles.card, isUnread && styles.cardUnread]}
+            onPress={goToChat}
+            activeOpacity={0.7}
+        >
+            <Avatar name={otherUser.name} />
+
+            <View style={styles.contentContainer}>
+                <View style={styles.topRow}>
+                    <Text style={[styles.userName, isUnread && styles.userNameUnread]} numberOfLines={1}>
+                        {otherUser.name}
+                    </Text>
+                    <Text style={[styles.timeText, isUnread && styles.timeTextUnread]}>
+                        {formatTime(item.last_message_at)}
+                    </Text>
+                </View>
+
+                <View style={styles.bottomRow}>
+                    <Text
+                        style={[styles.lastMessage, isUnread && styles.lastMessageUnread]}
+                        numberOfLines={1}
+                    >
+                        {item.last_message_content || '👋 Inicia la conversación...'}
+                    </Text>
+
+                    {isUnread && (
+                        <View style={styles.unreadBadge}>
+                            {/* Punto indicador */}
+                        </View>
+                    )}
+                </View>
             </View>
-            <View style={styles.chatContent}>
-                <Text style={styles.userName}>{otherUser.name}</Text>
-                <Text style={styles.lastMessage} numberOfLines={1}>
-                    {item.last_message_content || 'Inicia la conversación...'}
-                </Text>
-            </View>
-            <Text style={styles.time}>
-                {item.last_message_at ? new Date(item.last_message_at).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' }) : ''}
-            </Text>
         </TouchableOpacity>
     );
 };
 
-// Pantalla principal de la lista de chats
 export default function ConversationListScreen() {
     const { session, profile } = useAuth();
     const [conversations, setConversations] = useState([]);
+    const [filteredConversations, setFilteredConversations] = useState([]);
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const isFocused = useIsFocused();
 
-    // Función para cargar las conversaciones
     const fetchConversations = async () => {
         if (!session?.user?.id) return;
 
-        // ----- MODIFICACIÓN 1: LLAMAR RPC -----
-        // Primero, llamamos a la función de la BD para que cree las conversaciones
-        // que falten (basadas en mascotas/veterinarios).
+        // 1. Asegurar conversaciones creadas
         const { error: rpcError } = await supabase.rpc('create_conversations_for_my_contacts');
-        if (rpcError) {
-            console.error('Error creando conversaciones automáticas:', rpcError.message);
-        }
-        // ----------------------------------------
+        if (rpcError) console.error('RPC Error:', rpcError.message);
 
-        // Hacemos un 'join' para obtener los datos de los perfiles de cliente y veterinario
+        // 2. Obtener datos (incluyendo estado de lectura)
         const { data, error } = await supabase
             .from('conversations')
             .select(`
                 id,
                 last_message_content,
                 last_message_at,
+                last_message_is_read,      
+                last_message_sender_id,    
                 client_id ( id, name, avatar_url ),
                 vet_id ( id, name, avatar_url )
             `)
             .or(`client_id.eq.${session.user.id},vet_id.eq.${session.user.id}`)
-            // ----- MODIFICACIÓN 2: ORDENAMIENTO -----
-            // 'nulls: 'last'' envía las conversaciones nuevas (vacías) al final.
             .order('last_message_at', { ascending: false, nulls: 'last' });
 
         if (error) {
-            console.error('Error fetching conversations:', error.message);
+            console.error('Fetch Error:', error.message);
         } else {
             setConversations(data);
+            setFilteredConversations(data);
         }
         setLoading(false);
         setRefreshing(false);
     };
 
-    // Cargar conversaciones cuando la pantalla se muestra
+    // Filtro de búsqueda local
+    const handleSearch = (text) => {
+        setSearch(text);
+        if (text.trim() === '') {
+            setFilteredConversations(conversations);
+        } else {
+            const filtered = conversations.filter(item => {
+                const otherUser = item.client_id?.id === session.user.id ? item.vet_id : item.client_id;
+                return otherUser?.name?.toLowerCase().includes(text.toLowerCase());
+            });
+            setFilteredConversations(filtered);
+        }
+    };
+
     useEffect(() => {
         if (isFocused) {
             setLoading(true);
@@ -99,47 +158,16 @@ export default function ConversationListScreen() {
         }
     }, [isFocused, session]);
 
-    // Suscripción a Realtime
+    // Realtime
     useEffect(() => {
         if (!session?.user?.id) return;
-
-        // Escuchamos cambios en la tabla 'conversations'
         const channel = supabase
-            .channel('public:conversations')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'conversations',
-                    // Filtramos para solo escuchar cambios que nos involucren
-                    filter: `client_id=eq.${session.user.id}`
-                },
-                (payload) => {
-                    console.log('Cambio recibido en conversations (cliente)!', payload);
-                    // Cuando hay un cambio, simplemente volvemos a cargar todo
-                    fetchConversations();
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'conversations',
-                    filter: `vet_id=eq.${session.user.id}`
-                },
-                (payload) => {
-                    console.log('Cambio recibido en conversations (vet)!', payload);
-                    fetchConversations();
-                }
-            )
+            .channel('conversations_list')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `client_id=eq.${session.user.id}` }, () => fetchConversations())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `vet_id=eq.${session.user.id}` }, () => fetchConversations())
             .subscribe();
 
-        // Limpiamos la suscripción al salir de la pantalla
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(channel); };
     }, [session]);
 
     const onRefresh = useCallback(() => {
@@ -147,40 +175,67 @@ export default function ConversationListScreen() {
         fetchConversations();
     }, [session]);
 
+    // --- UI DE CARGA ---
     if (loading) {
-        return <ActivityIndicator style={{ flex: 1, justifyContent: 'center' }} size="large" color={COLORS.primary} />;
+        return (
+            <View style={[styles.container, styles.center]}>
+                <ActivityIndicator size="large" color={COLORS.accent} />
+            </View>
+        );
     }
 
     return (
         <View style={styles.container}>
-            {conversations.length === 0 ? (
-                // ----- MODIFICACIÓN 3: MENSAJE DE AYUDA -----
-                <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No tienes conversaciones activas.</Text>
-                    {/* Asumimos que `profile.role.name` está disponible gracias a la consulta en `Home.js` */}
-                    {profile?.role?.name === 'cliente' && (
-                        <Text style={styles.emptySubText}>
-                            Cuando asignes un veterinario principal a tus mascotas, aparecerá aquí para chatear.
-                        </Text>
-                    )}
-                    {profile?.role?.name === 'veterinario' && (
-                        <Text style={styles.emptySubText}>
-                            Cuando tengas mascotas asignadas como su veterinario principal, sus dueños aparecerán aquí.
-                        </Text>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+
+            {/* HEADER CON BUSCADOR */}
+            <View style={styles.headerContainer}>
+                <Text style={styles.headerTitle}>Mensajes</Text>
+                <View style={styles.searchBar}>
+                    <Ionicons name="search" size={20} color={COLORS.primary} style={{ opacity: 0.6 }} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Buscar conversación..."
+                        placeholderTextColor="#888"
+                        value={search}
+                        onChangeText={handleSearch}
+                    />
+                    {search.length > 0 && (
+                        <TouchableOpacity onPress={() => handleSearch('')}>
+                            <Ionicons name="close-circle" size={20} color={COLORS.gray || '#888'} />
+                        </TouchableOpacity>
                     )}
                 </View>
-            ) : (
-                <FlatList
-                    data={conversations}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                        <ConversationItem item={item} currentUserId={session.user.id} />
-                    )}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                    }
-                />
-            )}
+            </View>
+
+            {/* LISTA DE CHATS */}
+            <FlatList
+                data={filteredConversations}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                    <ConversationItem item={item} currentUserId={session.user.id} />
+                )}
+                contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={COLORS.white}
+                        colors={[COLORS.accent]}
+                    />
+                }
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyState}>
+                        <Ionicons name="chatbubbles-outline" size={80} color={COLORS.secondary} />
+                        <Text style={styles.emptyTitle}>¡Nada por aquí!</Text>
+                        <Text style={styles.emptyText}>
+                            {profile?.role?.name === 'cliente'
+                                ? "Tus veterinarios aparecerán aquí cuando tengas citas o asignaciones."
+                                : "Tus pacientes aparecerán aquí cuando tengas asignaciones."}
+                        </Text>
+                    </View>
+                )}
+            />
         </View>
     );
 }
@@ -188,66 +243,157 @@ export default function ConversationListScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.lightGray, // Un color de fondo suave
+        backgroundColor: COLORS.primary, // Fondo oscuro/principal
     },
-    chatItem: {
+    center: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    // HEADER
+    headerContainer: {
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: 10,
+        backgroundColor: COLORS.primary,
+    },
+    headerTitle: {
+        fontFamily: FONTS.PoppinsBold,
+        fontSize: SIZES.h1,
+        color: COLORS.white,
+        marginBottom: 15,
+    },
+    searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: SIZES.padding,
         backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.lightGray,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 45,
     },
-    avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: COLORS.primary,
+    searchInput: {
+        flex: 1,
+        marginLeft: 10,
+        fontFamily: FONTS.PoppinsRegular,
+        fontSize: SIZES.body,
+        color: COLORS.black,
+    },
+
+    // LISTA
+    listContent: {
+        paddingHorizontal: 15,
+        paddingBottom: 20,
+    },
+
+    // TARJETA (CARD)
+    card: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.white,
+        borderRadius: 16,
+        padding: 15,
+        marginBottom: 12,
+        alignItems: 'center',
+        // Sombras
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    cardUnread: {
+        backgroundColor: '#F0FCFA', // Un tono muy suave del secondary/accent para resaltar
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.accent,
+    },
+
+    // AVATAR
+    avatarContainer: {
+        width: 55,
+        height: 55,
+        borderRadius: 28,
+        backgroundColor: COLORS.secondary, // Fondo suave
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: SIZES.padding,
+        marginRight: 15,
+        borderWidth: 1,
+        borderColor: COLORS.accent,
     },
     avatarText: {
-        color: COLORS.white,
         fontFamily: FONTS.PoppinsBold,
-        fontSize: SIZES.h3,
+        fontSize: 22,
+        color: COLORS.primary,
     },
-    chatContent: {
+
+    // CONTENIDO DEL CARD
+    contentContainer: {
         flex: 1,
-        justifyContent: 'center',
+    },
+    topRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
     },
     userName: {
         fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.body,
-        color: COLORS.textPrimary,
+        fontSize: SIZES.body + 1,
+        color: COLORS.primary,
+        flex: 1,
+    },
+    userNameUnread: {
+        fontFamily: FONTS.PoppinsBold,
+        color: COLORS.black,
+    },
+    timeText: {
+        fontFamily: FONTS.PoppinsRegular,
+        fontSize: 11,
+        color: '#888',
+        marginLeft: 10,
+    },
+    timeTextUnread: {
+        color: COLORS.accent,
+        fontFamily: FONTS.PoppinsSemiBold,
+    },
+    bottomRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     lastMessage: {
         fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.caption,
-        color: COLORS.textSecondary,
-    },
-    time: {
-        fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.caption,
-        color: COLORS.textSecondary,
-    },
-    emptyContainer: {
+        fontSize: 13,
+        color: '#666',
         flex: 1,
-        justifyContent: 'center',
+        marginRight: 10,
+    },
+    lastMessageUnread: {
+        fontFamily: FONTS.PoppinsSemiBold,
+        color: COLORS.primary,
+    },
+    unreadBadge: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: COLORS.red, // Punto rojo para llamar la atención
+    },
+
+    // EMPTY STATE
+    emptyState: {
+        marginTop: 80,
         alignItems: 'center',
-        paddingHorizontal: SIZES.padding * 2,
+        paddingHorizontal: 30,
+    },
+    emptyTitle: {
+        fontFamily: FONTS.PoppinsBold,
+        fontSize: SIZES.h2,
+        color: COLORS.secondary,
+        marginTop: 15,
+        marginBottom: 10,
     },
     emptyText: {
-        fontFamily: FONTS.PoppinsSemiBold,
-        fontSize: SIZES.body,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-    },
-    emptySubText: { // Estilo nuevo para el texto de ayuda
         fontFamily: FONTS.PoppinsRegular,
-        fontSize: SIZES.caption,
-        color: COLORS.textSecondary,
+        fontSize: SIZES.body,
+        color: COLORS.textPrimary, // Color claro para contrastar con fondo oscuro
         textAlign: 'center',
-        marginTop: SIZES.base,
+        opacity: 0.8,
     },
 });
