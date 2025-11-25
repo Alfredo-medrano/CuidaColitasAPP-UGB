@@ -81,9 +81,20 @@ export default function AdminHome({ navigation }) {
         <Text style={styles.sectionSubtitle}>Resumen de usuarios activos</Text>
 
         <View style={styles.cardRow}>
-          <DashboardCard icon="stethoscope" iconBg={COLORS.card} title="Veterinarios" value={loading ? '—' : vetCount} />
-          <DashboardCard icon="account-group-outline" iconBg="#6B6B6B" title="Clientes" value={loading ? '—' : clientCount} />
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => navigation.navigate('Vets')}>
+            <DashboardCard icon="stethoscope" iconBg={COLORS.card} title="Veterinarios" value={loading ? '—' : vetCount} />
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => navigation.navigate('Clients')}>
+            <DashboardCard icon="account-group-outline" iconBg="#6B6B6B" title="Clientes" value={loading ? '—' : clientCount} />
+          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity onPress={() => navigation.navigate('CalendarioMaestro')}>
+          <SummaryCard
+            left="Calendario Global"
+            right={<MaterialCommunityIcons name="calendar-month" size={24} color={COLORS.accent} />}
+          />
+        </TouchableOpacity>
 
         <SummaryCard left="Total Usuarios" right={<Text style={styles.summaryValue}>{loading ? '—' : totalUsers}</Text>} />
         <SummaryCard

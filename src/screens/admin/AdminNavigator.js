@@ -2,28 +2,24 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { COLORS, FONTS } from '../../theme/theme'; // Ajusta la ruta a tu theme
+import { COLORS, FONTS } from '../../theme/theme';
 
 // Pantallas principales
 import AdminHome from './AdminHome';
 import AdminProfile from './AdminProfile';
-import GestionVets from './GestionVets'; //
+import GestionVets from './GestionVets';
+import EditVet from './EditVet';
+import GestionClientes from './GestionClientes';
+import DetalleCliente from './DetalleCliente';
+import CalendarioMaestro from './CalendarioMaestro';
 
 const Stack = createStackNavigator();
 
-
-
-const ClientsScreen = () => (
-  <View style={styles.placeholderContainer}>
-    <Text style={styles.placeholderText}>Pantalla de Clientes (WIP)</Text>
-  </View>
-);
 const StatsScreen = () => (
   <View style={styles.placeholderContainer}>
     <Text style={styles.placeholderText}>Pantalla de Estadísticas (WIP)</Text>
   </View>
 );
-
 
 export default function AdminNavigator() {
   return (
@@ -43,31 +39,48 @@ export default function AdminNavigator() {
         headerBackTitleVisible: false,
       }}
     >
-
       <Stack.Screen
         name="AdminHome"
         component={AdminHome}
         options={{ headerShown: false }}
       />
-      
+
       <Stack.Screen
         name="AdminProfile"
         component={AdminProfile}
         options={{ title: 'Mi Perfil' }}
       />
 
-   
       <Stack.Screen
         name="Vets"
-        component={GestionVets} 
-        options={{ headerShown: false }} 
+        component={GestionVets}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen
+        name="EditVet"
+        component={EditVet}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="Clients"
-        component={ClientsScreen}
-        options={{ title: 'Gestionar Clientes' }}
+        component={GestionClientes}
+        options={{ headerShown: false }}
       />
+
+      <Stack.Screen
+        name="DetalleCliente"
+        component={DetalleCliente}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen
+        name="CalendarioMaestro"
+        component={CalendarioMaestro}
+        options={{ headerShown: false }}
+      />
+
       <Stack.Screen
         name="Stats"
         component={StatsScreen}
