@@ -5,6 +5,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+import { validatePhone, validateRequired, sanitizeInput } from '../../utils/validation.js';
+
+const BUCKET_ID = 'attachments';
 
 // Función para tamaños responsivos
 const { width } = Dimensions.get('window');
@@ -50,6 +54,7 @@ const SecondaryButton = ({ title, onPress, disabled, icon, color = COLORS.primar
 
 export default function EditProfileClient({ route, navigation }) {
     const { profile: initialProfile } = route.params;
+    const { avatarUrl: contextAvatarUrl, refetchProfile } = useAuth();
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [name, setName] = useState('');
@@ -58,6 +63,10 @@ export default function EditProfileClient({ route, navigation }) {
     const [emergencyName, setEmergencyName] = useState('');
     const [emergencyPhone, setEmergencyPhone] = useState('');
     const [avatarUrl, setAvatarUrl] = useState(null);
+    const [avatarPath, setAvatarPath] = useState(null);
+
+    // Hook para permisos de galería
+    const [mediaPerm, requestMediaPerm] = ImagePicker.useMediaLibraryPermissions();
 
     // Cargar datos iniciales del perfil
     useEffect(() => {
@@ -65,29 +74,56 @@ export default function EditProfileClient({ route, navigation }) {
             setName(initialProfile.name || '');
             setPhone(initialProfile.phone_number || '');
             setAddress(initialProfile.address || '');
-            setAvatarUrl(initialProfile.avatar_url || null);
             setEmergencyName(initialProfile.emergency_name || '');
             setEmergencyPhone(initialProfile.emergency_phone || '');
+            setAvatarPath(initialProfile.avatar_url || null);
+            setAvatarUrl(contextAvatarUrl || null);
         }
-    }, [initialProfile]);
+    }, [initialProfile, contextAvatarUrl]);
 
-    // Función para seleccionar imagen de avatar
+    // Función para seleccionar imagen de avatar (mejorada)
     const pickImage = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permisos necesarios', 'Se requieren permisos para acceder a la galería.');
-            return;
-        }
+        try {
+            // 1) Permisos robustos con mensajes específicos por plataforma
+            if (!mediaPerm || mediaPerm.status !== 'granted') {
+                const perm = await requestMediaPerm();
+                if (!perm.granted) {
+                    Alert.alert(
+                        'Permiso requerido',
+                        Platform.OS === 'ios'
+                            ? 'Habilita "Fotos" para la app en Ajustes > Privacidad > Fotos.'
+                            : 'Habilita "Fotos/Multimedia" en Ajustes > Apps > CuidaColitas > Permisos.'
+                    );
+                    return;
+                }
+            }
 
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-        });
+            // 2) Construir opciones según API disponible (evita warnings)
+            const opts = {
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.7,
+                selectionLimit: 1,
+            };
+            if (ImagePicker?.MediaType) {
+                // API nueva: array de MediaType
+                opts.mediaTypes = [ImagePicker.MediaType.Images];
+            } else {
+                // API antigua: enum
+                opts.mediaTypes = ImagePicker.MediaTypeOptions.Images;
+            }
 
-        if (!result.canceled && result.assets && result.assets[0].uri) {
-            uploadAvatar(result.assets[0].uri);
+            const result = await ImagePicker.launchImageLibraryAsync(opts);
+
+            // 3) Procesar selección
+            if (!result.canceled && result.assets && result.assets[0]?.uri) {
+                await uploadAvatar(result.assets[0].uri);
+            } else if (Platform.OS === 'android') {
+                console.log('[ImagePicker] No image selected / empty gallery');
+            }
+        } catch (e) {
+            console.log('[pickImage] error', e?.message);
+            Alert.alert('Error', 'No se pudo abrir la galería.');
         }
     };
 
@@ -98,18 +134,40 @@ export default function EditProfileClient({ route, navigation }) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Usuario no encontrado.");
 
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            const fileExt = uri.split('.').pop();
-            const filePath = `${user.id}.${fileExt}`;
+            // Leer el archivo como arrayBuffer (evita .blob())
+            const res = await fetch(uri);
+            const arrayBuffer = await res.arrayBuffer();
+            const fileBytes = new Uint8Array(arrayBuffer);
 
-            const { error } = await supabase.storage.from('avatars').upload(filePath, blob, { upsert: true });
-            if (error) throw error;
+            // Derivar extensión por la URI (fallback a jpg)
+            const rawExt = (uri.split('.').pop() || '').toLowerCase();
+            const ext = ['png', 'webp', 'jpg', 'jpeg'].includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg';
+            const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
-            const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-            setAvatarUrl(data.publicUrl);
+            const filePath = `${user.id}.${ext}`;
+
+            // Subir binario al bucket 'attachments'
+            const { error: uploadError } = await supabase.storage
+                .from(BUCKET_ID)
+                .upload(filePath, fileBytes, {
+                    upsert: true,
+                    contentType: mime,
+                });
+
+            if (uploadError) throw uploadError;
+
+            // Obtener signed URL para preview inmediato
+            const { data: signedData, error: signError } = await supabase.storage
+                .from(BUCKET_ID)
+                .createSignedUrl(filePath, 60 * 15);
+
+            if (signError) throw signError;
+
+            setAvatarPath(filePath);
+            setAvatarUrl(signedData.signedUrl);
         } catch (error) {
-            Alert.alert('Error', 'No se pudo subir la imagen.');
+            console.log('[uploadAvatar]', error?.message);
+            Alert.alert('Error', `No se pudo subir la imagen: ${error.message}`);
         } finally {
             setUploading(false);
         }
@@ -122,20 +180,33 @@ export default function EditProfileClient({ route, navigation }) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("No hay un usuario logueado.");
 
+            const nameClean = sanitizeInput(name);
+            const phoneClean = sanitizeInput(phone);
+            const addressClean = sanitizeInput(address);
+            const emergencyNameClean = sanitizeInput(emergencyName);
+            const emergencyPhoneClean = sanitizeInput(emergencyPhone);
+
+            if (!validateRequired(nameClean)) throw new Error("El nombre es obligatorio.");
+            if (phoneClean && !validatePhone(phoneClean)) throw new Error("El teléfono no es válido.");
+            if (emergencyPhoneClean && !validatePhone(emergencyPhoneClean)) throw new Error("El teléfono de emergencia no es válido.");
+
             const updates = {
                 id: user.id,
-                name: name.trim(),
-                phone_number: phone,
-                address,
-                emergency_name: emergencyName,
-                emergency_phone: emergencyPhone,
-                avatar_url: avatarUrl,
+                name: nameClean,
+                phone_number: phoneClean,
+                address: addressClean,
+                emergency_name: emergencyNameClean,
+                emergency_phone: emergencyPhoneClean,
+                avatar_url: avatarPath || null,
                 role_id: initialProfile.role_id,
                 updated_at: new Date(),
             };
 
             const { error } = await supabase.from('profiles').upsert(updates);
             if (error) throw error;
+
+            // Refrescar el perfil en el contexto para actualizar el avatar
+            await refetchProfile();
 
             Alert.alert("Éxito", "Perfil guardado correctamente.");
             navigation.goBack();

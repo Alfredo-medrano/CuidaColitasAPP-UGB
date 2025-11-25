@@ -1,39 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Alert, TouchableOpacity, StatusBar } from 'react-native';
 import { supabase } from '../../api/Supabase';
 import { useIsFocused } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/FontAwesome5';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
 import moment from 'moment';
 import 'moment/locale/es';
+import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
-moment.locale('es');
+// Configuración de idioma para el calendario
+LocaleConfig.locales['es'] = {
+  monthNames: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+  monthNamesShort: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+  dayNames: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  dayNamesShort: ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'],
+  today: 'Hoy',
+};
+LocaleConfig.defaultLocale = 'es';
 
 export default function AgendaDelDia({ navigation }) {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('Hoy');
-  const [selectedDate, setSelectedDate] = useState(moment());
+  const [selectedDate, setSelectedDate] = useState(moment().format('YYYY-MM-DD'));
+  const [currentMonth, setCurrentMonth] = useState(moment());
   const isFocused = useIsFocused();
 
-  const getFilterDates = (filterName) => {
+  // Verificar si la fecha seleccionada es hoy o futura (para habilitar "Nueva Cita")
+  const isDatePast = useMemo(() => {
     const today = moment().startOf('day');
-    let startDate, endDate;
-    if (filterName === 'Hoy') {
-      startDate = today.toDate();
-      endDate = moment(today).endOf('day').toDate();
-    } else if (filterName === 'Mañana') {
-      const tomorrow = moment().add(1, 'day').startOf('day');
-      startDate = tomorrow.toDate();
-      endDate = moment(tomorrow).endOf('day').toDate();
-    } else if (filterName === 'Semana') {
-      const startOfWeek = moment().startOf('week');
-      const endOfWeek = moment().endOf('week');
-      startDate = startOfWeek.toDate();
-      endDate = endOfWeek.toDate();
-    }
-    return { startDate, endDate };
-  };
+    const selected = moment(selectedDate).startOf('day');
+    return selected.isBefore(today);
+  }, [selectedDate]);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -41,7 +39,9 @@ export default function AgendaDelDia({ navigation }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no encontrado");
 
-      const { startDate, endDate } = getFilterDates(filter);
+      // Definir rango del día seleccionado
+      const startOfDay = moment(selectedDate).startOf('day').toISOString();
+      const endOfDay = moment(selectedDate).endOf('day').toISOString();
 
       const { data, error } = await supabase
         .from('appointments')
@@ -54,10 +54,10 @@ export default function AgendaDelDia({ navigation }) {
           status:appointment_status ( status )
         `)
         .eq('vet_id', user.id)
-        .gte('appointment_time', startDate.toISOString())
-        .lte('appointment_time', endDate.toISOString())
+        .gte('appointment_time', startOfDay)
+        .lte('appointment_time', endOfDay)
         .order('appointment_time', { ascending: true });
-      
+
       if (error) throw error;
       setAppointments(data);
 
@@ -67,7 +67,7 @@ export default function AgendaDelDia({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [selectedDate]);
 
   useEffect(() => {
     if (isFocused) {
@@ -75,63 +75,115 @@ export default function AgendaDelDia({ navigation }) {
     }
   }, [isFocused, fetchAppointments]);
 
-  const renderItem = ({ item }) => (
-    <Pressable style={styles.card} onPress={() => navigation.navigate('DetalleCita', { appointmentId: item.id, userRole: 'veterinario' })}>
-      <View style={styles.cardTimeContainer}>
-        <Text style={styles.cardTime}>{moment(item.appointment_time).format('h:mm a')}</Text>
-        <Text style={styles.cardDate}>{moment(item.appointment_time).format('ddd D MMM')}</Text>
-      </View>
-      <View style={styles.cardDetails}>
-        <Text style={styles.petName}>{item.pet.name}</Text>
-        <Text style={styles.ownerName}>Dueño: {item.client.name}</Text>
-        <Text style={styles.reason}>{item.reason || 'Consulta general'}</Text>
-      </View>
-      <View style={styles.statusBadgeContainer}>
-        <View style={[styles.statusBadge, { backgroundColor: item.status.status === 'Confirmada' ? '#d4edda' : '#fff3cd' }]}>
-            <Text style={[styles.statusText, { color: item.status.status === 'Confirmada' ? '#155724' : '#856404' }]}>{item.status.status}</Text>
+  const handleMonthChange = (month) => {
+    setCurrentMonth(moment(month.timestamp));
+  };
+
+  const renderItem = ({ item }) => {
+    const statusColors = {
+      Confirmada: { bg: '#A8E6DC80', text: '#027A74' },
+      Programada: { bg: '#FFF4CC', text: '#CDA37B' },
+      Pendiente: { bg: '#FFF4CC', text: '#CDA37B' },
+      Cancelada: { bg: '#FFD2D2', text: '#D32F2F' },
+      Completada: { bg: '#D3E5FF', text: '#004085' },
+      Perdida: { bg: '#FFCCCC', text: '#FF0000' },
+    };
+
+    const statusStyle = statusColors[item.status.status] || statusColors['Programada'];
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate('DetalleCita', { appointmentId: item.id, userRole: 'veterinario' })}
+      >
+        <View style={styles.timeContainer}>
+          <Text style={styles.timeText}>{moment(item.appointment_time).format('HH:mm')}</Text>
         </View>
-      </View>
-    </Pressable>
-  );
+        <View style={styles.detailsContainer}>
+          <Text style={styles.petName}>{item.pet.name}</Text>
+          <Text style={styles.ownerText}>Dueño: {item.client.name}</Text>
+          <Text style={styles.reasonText}>{item.reason || 'Consulta general'}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+          <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status.status}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}><Icon name="arrow-left" size={20} color="#fff" /></Pressable>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Agenda</Text>
-        <View style={{width: 20}} />
+
+        {/* Botón Nueva Cita (Solo si la fecha no es pasada) */}
+        {!isDatePast ? (
+          <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('NuevaCita')}>
+            <Ionicons name="add" size={20} color={COLORS.white} />
+            <Text style={styles.addButtonText}>Nueva</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 80 }} /> // Espaciador para mantener alineación
+        )}
       </View>
-      <View style={styles.filterContainer}>
-        <Pressable 
-          style={[styles.filterButton, filter === 'Hoy' && styles.filterButtonActive]} 
-          onPress={() => setFilter('Hoy')}>
-          <Text style={[styles.filterText, filter === 'Hoy' && styles.filterTextActive]}>Hoy</Text>
-        </Pressable>
-        <Pressable 
-          style={[styles.filterButton, filter === 'Mañana' && styles.filterButtonActive]} 
-          onPress={() => setFilter('Mañana')}>
-          <Text style={[styles.filterText, filter === 'Mañana' && styles.filterTextActive]}>Mañana</Text>
-        </Pressable>
-        <Pressable 
-          style={[styles.filterButton, filter === 'Semana' && styles.filterButtonActive]} 
-          onPress={() => setFilter('Semana')}>
-          <Text style={[styles.filterText, filter === 'Semana' && styles.filterTextActive]}>Semana</Text>
-        </Pressable>
-      </View>
-      <View style={styles.listHeader}>
-        <Text style={styles.listTitle}>Próximas Citas</Text>
-        <Pressable style={styles.newButton} onPress={() => navigation.navigate('NuevaCita')}>
-          <Icon name="plus" size={14} color="#fff" />
-          <Text style={styles.newButtonText}>Nueva</Text>
-        </Pressable>
-      </View>
-      {loading ? <ActivityIndicator style={{marginTop: 50}} size="large" color="#013847" /> : (
+
+      <Calendar
+        style={styles.calendar}
+        current={selectedDate}
+        onDayPress={(day) => setSelectedDate(day.dateString)}
+        onMonthChange={handleMonthChange}
+        markingType={'custom'}
+        markedDates={{
+          [selectedDate]: {
+            customStyles: {
+              container: {
+                backgroundColor: COLORS.primary,
+                elevation: 2
+              },
+              text: {
+                color: COLORS.white,
+                fontWeight: 'bold'
+              }
+            }
+          }
+        }}
+        theme={{
+          backgroundColor: 'white',
+          calendarBackground: 'white',
+          textSectionTitleColor: COLORS.card || '#8A8A8A',
+          selectedDayBackgroundColor: COLORS.primary,
+          selectedDayTextColor: COLORS.white,
+          todayTextColor: COLORS.accent,
+          dayTextColor: COLORS.primary,
+          monthTextColor: COLORS.primary,
+          textDayFontFamily: FONTS.PoppinsRegular,
+          textMonthFontFamily: FONTS.PoppinsBold,
+          textDayHeaderFontFamily: FONTS.PoppinsSemiBold,
+          arrowColor: COLORS.primary,
+          textDisabledColor: COLORS.secondary ? `${COLORS.secondary}80` : '#E0E0E0',
+        }}
+      />
+
+      <Text style={styles.sectionTitle}>Citas para {moment(selectedDate).format('D [de] MMMM')}</Text>
+
+      {loading ? (
+        <ActivityIndicator style={styles.loader} size="large" color={COLORS.accent} />
+      ) : (
         <FlatList
           data={appointments}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.emptyText}>No tienes citas para este período.</Text>}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No hay citas programadas para este día.</Text>
+            </View>
+          }
         />
       )}
     </SafeAreaView>
@@ -139,30 +191,32 @@ export default function AgendaDelDia({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#013847' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 },
-  headerTitle: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  filterContainer: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20, backgroundColor: '#013847' },
-  filterButton: { paddingVertical: 10, paddingHorizontal: 20 },
-  filterButtonActive: { borderBottomWidth: 3, borderBottomColor: '#43C0AF' },
-  filterText: { color: '#fff', fontWeight: 'bold' },
-  filterTextActive: { color: '#43C0AF' },
-  listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 30, paddingBottom: 15, backgroundColor: '#E2ECED', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  listTitle: { fontSize: 20, fontWeight: 'bold', color: '#013847' },
-  newButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#43C0AF', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20 },
-  newButtonText: { color: '#fff', fontWeight: 'bold', marginLeft: 5 },
-  list: { paddingHorizontal: 20, backgroundColor: '#E2ECED', flexGrow: 1 },
-  emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#666' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, marginBottom: 15, flexDirection: 'row', elevation: 3, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5 },
-  cardTimeContainer: { width: 80, alignItems: 'center', justifyContent: 'center', borderRightWidth: 1, borderRightColor: '#f0f0f0', marginRight: 15 },
-  cardTime: { fontSize: 16, fontWeight: 'bold', color: '#013847' },
-  cardDate: { fontSize: 12, color: '#999', marginTop: 5 },
-  cardDetails: { flex: 1 },
-  petName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  ownerName: { fontSize: 14, color: '#666', marginTop: 2 },
-  reason: { fontSize: 14, color: '#666', marginTop: 2, fontStyle: 'italic' },
-  statusBadgeContainer: { justifyContent: 'center', alignItems: 'flex-end' },
-  statusBadge: { borderRadius: 12, paddingVertical: 4, paddingHorizontal: 10 },
-  statusText: { fontSize: 12, fontWeight: 'bold' },
-  chatButton: { marginTop: 10 },
+  container: { flex: 1, backgroundColor: COLORS.primary },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 },
+  headerButton: { width: 40 },
+  headerTitle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.h2, color: COLORS.textPrimary },
+  addButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.accent, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12 },
+  addButtonText: { fontFamily: FONTS.PoppinsSemiBold, color: COLORS.white, marginLeft: 5 },
+
+  calendar: { borderRadius: 16, marginHorizontal: 20, marginTop: 10, elevation: 4, shadowColor: '#000' },
+
+  sectionTitle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: SIZES.h3, color: COLORS.textPrimary, paddingHorizontal: 20, marginVertical: 20 },
+
+  list: { paddingHorizontal: 20, paddingBottom: 20 },
+  loader: { marginTop: 50 },
+
+  card: { flexDirection: 'row', backgroundColor: COLORS.secondary, borderRadius: 12, padding: 15, marginBottom: 15, alignItems: 'center' },
+  timeContainer: { justifyContent: 'center', alignItems: 'center', paddingRight: 15, borderRightWidth: 1, borderRightColor: 'rgba(0,0,0,0.1)', marginRight: 15 },
+  timeText: { fontFamily: FONTS.PoppinsBold, fontSize: 18, color: COLORS.primary },
+
+  detailsContainer: { flex: 1 },
+  petName: { fontFamily: FONTS.PoppinsBold, fontSize: 16, color: COLORS.primary },
+  ownerText: { fontFamily: FONTS.PoppinsRegular, color: COLORS.card || '#333', fontSize: 13 },
+  reasonText: { fontFamily: FONTS.PoppinsRegular, color: COLORS.card || '#333', fontSize: 13, fontStyle: 'italic', marginTop: 2 },
+
+  statusBadge: { alignSelf: 'flex-start', borderRadius: 10, paddingVertical: 4, paddingHorizontal: 8 },
+  statusText: { fontFamily: FONTS.PoppinsSemiBold, fontSize: 12 },
+
+  emptyContainer: { alignItems: 'center', marginTop: 30 },
+  emptyText: { fontFamily: FONTS.PoppinsRegular, color: COLORS.secondary, textAlign: 'center' },
 });

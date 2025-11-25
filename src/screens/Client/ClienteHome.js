@@ -20,7 +20,7 @@ const quickActions = [
 // Componente principal de la pantalla de inicio del cliente
 export default function ClienteHome({ navigation }) {
   const isFocused = useIsFocused();
-  const { profile } = useAuth();
+  const { profile, avatarUrl } = useAuth(); // ✅ Obtener avatarUrl del contexto
   const { unreadNotifications, unreadCount, loading, refresh } = useNotifications();
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function ClienteHome({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <HomeHeader
         userName={profile?.name?.split(' ')[0] || 'Cliente'}
-        avatarUrl={profile?.avatar_url}
+        avatarUrl={avatarUrl} // ✅ Pasar signed URL del contexto
         notificationCount={unreadCount}
         onProfilePress={() => navigation.navigate('ProfileCliente')}
         onNotificationPress={() => navigation.navigate('Notificaciones')}
@@ -55,7 +55,7 @@ export default function ClienteHome({ navigation }) {
               <Text style={styles.seeAll}>Ver todas</Text>
             </TouchableOpacity>
           </View>
-          
+
           {unreadNotifications && unreadNotifications.length > 0 ? (
             <FlatList
               data={unreadNotifications}

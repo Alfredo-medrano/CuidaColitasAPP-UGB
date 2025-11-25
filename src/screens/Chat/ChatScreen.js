@@ -11,80 +11,93 @@ import {
     ActivityIndicator,
     Modal,
     Alert,
-    SafeAreaView,
     StatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import 'moment/locale/es';
 
-// --- IMPORTACIONES ---
 import { supabase } from '../../api/Supabase';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
 export default function ChatScreen({ route, navigation }) {
-    // Parámetros
     const { conversation_id, other_user_id, other_user_name } = route.params || {};
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
 
-    // Estados
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
-
-    // Modal Mascotas
     const [showPetsModal, setShowPetsModal] = useState(false);
     const [otherUserPets, setOtherUserPets] = useState([]);
     const [loadingPets, setLoadingPets] = useState(false);
 
     const flatListRef = useRef();
 
-    // ------------------------------------------------------------------
-    // 1. HEADER PERSONALIZADO
-    // ------------------------------------------------------------------
     useLayoutEffect(() => {
+        const isVet = profile?.roles?.name === 'veterinario';
+
         navigation.setOptions({
             title: other_user_name || 'Chat',
             headerStyle: { backgroundColor: COLORS.primary, elevation: 0, shadowOpacity: 0 },
             headerTintColor: COLORS.white,
             headerTitleStyle: { fontFamily: FONTS.PoppinsSemiBold, fontSize: 18 },
             headerRight: () => (
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.headerPetButton}
-                    onPress={() => {
-                        if (!other_user_id) {
-                            Alert.alert("Ups", "No se pudo identificar al usuario para ver sus mascotas.");
-                            return;
-                        }
-                        setShowPetsModal(true);
-                        fetchOtherUserPets();
-                    }}
-                >
-                    <Ionicons name="paw" size={18} color={COLORS.primary} />
-                    <Text style={styles.headerPetButtonText}>Mascotas</Text>
-                </TouchableOpacity>
+                isVet ? (
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={styles.headerPetButton}
+                        onPress={() => {
+                            if (!other_user_id) {
+                                Alert.alert("Ups", "No se pudo identificar al usuario para ver sus mascotas.");
+                                return;
+                            }
+                            setShowPetsModal(true);
+                            fetchOtherUserPets();
+                        }}
+                    >
+                        <Ionicons name="paw" size={18} color={COLORS.primary} />
+                        <Text style={styles.headerPetButtonText}>Mascotas</Text>
+                    </TouchableOpacity>
+                ) : null
             ),
         });
-    }, [navigation, other_user_name, other_user_id]);
+    }, [navigation, other_user_name, other_user_id, profile]);
 
-    // ------------------------------------------------------------------
-    // 2. LOGICA REALTIME
-    // ------------------------------------------------------------------
     useEffect(() => {
         if (!conversation_id) return;
 
         fetchMessages();
 
         const channel = supabase
-            .channel(`chat_room:${conversation_id}`)
+            .channel(`chat_room_${conversation_id}`, {
+                config: {
+                    broadcast: { self: false },
+                },
+            })
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversation_id}` },
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `conversation_id=eq.${conversation_id}`,
+                },
                 (payload) => {
-                    if (payload.eventType === 'INSERT') handleNewMessageRealtime(payload.new);
-                    else if (payload.eventType === 'UPDATE') handleMessageUpdateRealtime(payload.new);
+                    handleNewMessageRealtime(payload.new);
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `conversation_id=eq.${conversation_id}`,
+                },
+                (payload) => {
+                    handleMessageUpdateRealtime(payload.new);
                 }
             )
             .subscribe();
@@ -96,7 +109,16 @@ export default function ChatScreen({ route, navigation }) {
     }, [conversation_id]);
 
     const handleNewMessageRealtime = async (newMsg) => {
-        setMessages((prev) => [...prev, newMsg]);
+        setMessages((prev) => {
+            const exists = prev.some(msg => msg.id === newMsg.id);
+            if (exists) return prev;
+            return [...prev, newMsg];
+        });
+
+        setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+
         if (newMsg.sender_id !== user.id) {
             await supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id);
         }
@@ -106,9 +128,6 @@ export default function ChatScreen({ route, navigation }) {
         setMessages((prev) => prev.map((msg) => (msg.id === updatedMsg.id ? updatedMsg : msg)));
     };
 
-    // ------------------------------------------------------------------
-    // 3. FUNCIONES DE DATOS
-    // ------------------------------------------------------------------
     const fetchMessages = async () => {
         const { data, error } = await supabase
             .from('messages')
@@ -163,20 +182,14 @@ export default function ChatScreen({ route, navigation }) {
         return years === 0 ? 'Menos de 1 año' : `${years} años`;
     };
 
-    // ------------------------------------------------------------------
-    // 4. RENDERIZADO
-    // ------------------------------------------------------------------
     const renderMessageItem = ({ item, index }) => {
         const isMyMessage = item.sender_id === user.id;
-
-        // Lógica para agrupar mensajes visualmente (opcional)
         const isNextMessageMine = messages[index + 1]?.sender_id === item.sender_id;
 
         return (
             <View style={[
                 styles.messageBubble,
                 isMyMessage ? styles.myBubble : styles.otherBubble,
-                // Ajuste de bordes si hay mensajes consecutivos
                 isMyMessage && isNextMessageMine ? { borderBottomRightRadius: 4 } : {},
                 !isMyMessage && isNextMessageMine ? { borderBottomLeftRadius: 4 } : {}
             ]}>
@@ -191,7 +204,7 @@ export default function ChatScreen({ route, navigation }) {
                     {isMyMessage && (
                         <View style={{ marginLeft: 4 }}>
                             <Ionicons
-                                name={item.is_read ? "checkmark-done-all" : "checkmark"}
+                                name={item.is_read ? "checkmark-done" : "checkmark"}
                                 size={16}
                                 color={item.is_read ? COLORS.secondary : 'rgba(255,255,255,0.6)'}
                             />
@@ -203,63 +216,60 @@ export default function ChatScreen({ route, navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
             <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-
-            {loading ? (
-                <View style={styles.centerLoader}>
-                    <ActivityIndicator size="large" color={COLORS.card} />
-                </View>
-            ) : (
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={renderMessageItem}
-                    contentContainerStyle={styles.listContent}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                    ListEmptyComponent={() => (
-                        <View style={styles.emptyContainer}>
-                            <View style={styles.emptyIconBg}>
-                                <Ionicons name="chatbubbles-outline" size={40} color={COLORS.white} />
-                            </View>
-                            <Text style={styles.emptyText}>¡Saluda a {other_user_name}!</Text>
-                            <Text style={styles.emptySubText}>Comienza la conversación hoy.</Text>
-                        </View>
-                    )}
-                />
-            )}
-
-            {/* INPUT AREA */}
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
             >
+                {loading ? (
+                    <View style={styles.centerLoader}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                    </View>
+                ) : (
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={renderMessageItem}
+                        contentContainerStyle={messages.length === 0 ? { flex: 1, justifyContent: 'center' } : styles.listContent}
+                        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                        ListEmptyComponent={() => (
+                            <View style={styles.emptyContainer}>
+                                <View style={styles.emptyIconBg}>
+                                    <Ionicons name="chatbubbles-outline" size={32} color={COLORS.primary} />
+                                </View>
+                                <Text style={styles.emptyText}>No hay mensajes aún</Text>
+                                <Text style={styles.emptySubText}>¡Envía el primero!</Text>
+                            </View>
+                        )}
+                    />
+                )}
+
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.textInput}
-                        placeholder="Escribe un mensaje..."
-                        placeholderTextColor="#999"
                         value={newMessage}
                         onChangeText={setNewMessage}
+                        placeholder="Escribe un mensaje..."
+                        placeholderTextColor="#999"
                         multiline
-                        maxLength={500}
                     />
                     <TouchableOpacity
-                        onPress={handleSend}
                         style={[styles.sendBtn, !newMessage.trim() && styles.sendBtnDisabled]}
+                        onPress={handleSend}
                         disabled={!newMessage.trim()}
                     >
-                        <Ionicons name="send" size={20} color={COLORS.white} style={{ marginLeft: 2 }} />
+                        <Ionicons name="send" size={20} color={COLORS.white} />
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
 
-            {/* MODAL MASCOTAS */}
             <Modal
                 visible={showPetsModal}
-                animationType="fade"
+                animationType="slide"
                 transparent={true}
                 onRequestClose={() => setShowPetsModal(false)}
             >
@@ -267,48 +277,35 @@ export default function ChatScreen({ route, navigation }) {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Mascotas de {other_user_name}</Text>
-                            <TouchableOpacity onPress={() => setShowPetsModal(false)} style={styles.closeButton}>
-                                <Ionicons name="close" size={20} color={COLORS.primary} />
+                            <TouchableOpacity style={styles.closeButton} onPress={() => setShowPetsModal(false)}>
+                                <Ionicons name="close" size={24} color={COLORS.black} />
                             </TouchableOpacity>
                         </View>
 
                         {loadingPets ? (
-                            <ActivityIndicator color={COLORS.card} style={{ padding: 20 }} />
-                        ) : otherUserPets.length > 0 ? (
+                            <ActivityIndicator size="large" color={COLORS.primary} />
+                        ) : (
                             <FlatList
                                 data={otherUserPets}
                                 keyExtractor={(item) => item.id.toString()}
                                 renderItem={({ item }) => (
                                     <View style={styles.petCard}>
                                         <View style={styles.petIconBox}>
-                                            <Ionicons name="paw" size={22} color={COLORS.card} />
+                                            <Ionicons name="paw" size={24} color={COLORS.primary} />
                                         </View>
-                                        <View style={{ flex: 1 }}>
+                                        <View>
                                             <Text style={styles.petName}>{item.name}</Text>
-                                            <Text style={styles.petDetail}>
-                                                {item.breed || 'Raza desconocida'} • {calculateAge(item.birth_date)}
-                                            </Text>
-                                        </View>
-                                        {/* Badge de estado */}
-                                        <View style={[
-                                            styles.petStatusBadge,
-                                            { backgroundColor: item.status === 'Activo' ? COLORS.lightGreen : COLORS.lightRed }
-                                        ]}>
-                                            <Text style={[
-                                                styles.petStatusText,
-                                                { color: item.status === 'Activo' ? COLORS.card : COLORS.red }
-                                            ]}>
-                                                {item.status || 'N/A'}
-                                            </Text>
+                                            <Text style={styles.petDetail}>{item.species} • {item.breed}</Text>
+                                            <Text style={styles.petDetail}>{calculateAge(item.birth_date)}</Text>
                                         </View>
                                     </View>
                                 )}
+                                ListEmptyComponent={() => (
+                                    <View style={styles.emptyPetsContainer}>
+                                        <Text style={styles.emptyPetsText}>Este usuario no tiene mascotas registradas.</Text>
+                                    </View>
+                                )}
                             />
-                        ) : (
-                            <View style={styles.emptyPetsContainer}>
-                                <Ionicons name="paw-outline" size={40} color={COLORS.gray} />
-                                <Text style={styles.emptyPetsText}>Sin mascotas registradas</Text>
-                            </View>
                         )}
                     </View>
                 </View>
@@ -317,11 +314,10 @@ export default function ChatScreen({ route, navigation }) {
     );
 }
 
-// --- ESTILOS ---
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F4F6F8', // Fondo claro moderno
+        backgroundColor: '#F4F6F8',
     },
     centerLoader: {
         flex: 1,
@@ -332,8 +328,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         paddingVertical: 20,
     },
-
-    // BURBUJAS CHAT
     messageBubble: {
         maxWidth: '82%',
         paddingHorizontal: 14,
@@ -348,13 +342,13 @@ const styles = StyleSheet.create({
     },
     myBubble: {
         alignSelf: 'flex-end',
-        backgroundColor: COLORS.card, // Usamos el color "Card" (Teal) para mis mensajes
-        borderBottomRightRadius: 2, // Efecto burbuja
+        backgroundColor: COLORS.card,
+        borderBottomRightRadius: 2,
     },
     otherBubble: {
         alignSelf: 'flex-start',
         backgroundColor: COLORS.white,
-        borderBottomLeftRadius: 2, // Efecto burbuja
+        borderBottomLeftRadius: 2,
         borderWidth: 1,
         borderColor: '#EEE',
     },
@@ -365,7 +359,6 @@ const styles = StyleSheet.create({
     },
     myMsgText: { color: COLORS.white },
     otherMsgText: { color: '#333' },
-
     metaData: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
@@ -377,8 +370,6 @@ const styles = StyleSheet.create({
         fontFamily: FONTS.PoppinsRegular,
         marginTop: 2,
     },
-
-    // ESTADO VACÍO
     emptyContainer: {
         alignItems: 'center',
         marginTop: 80,
@@ -404,8 +395,6 @@ const styles = StyleSheet.create({
         color: COLORS.gray,
         marginTop: 5,
     },
-
-    // INPUT AREA
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -430,7 +419,7 @@ const styles = StyleSheet.create({
         fontFamily: FONTS.PoppinsRegular,
         fontSize: 15,
         marginRight: 10,
-        maxHeight: 100, // Crece hasta cierto punto
+        maxHeight: 100,
         color: COLORS.black,
     },
     sendBtn: {
@@ -440,15 +429,13 @@ const styles = StyleSheet.create({
         borderRadius: 23,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 1, // Alinear con input si es multilínea
+        marginBottom: 1,
         elevation: 2,
     },
     sendBtnDisabled: {
         backgroundColor: '#CCC',
         elevation: 0,
     },
-
-    // HEADER BUTTON
     headerPetButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -464,12 +451,10 @@ const styles = StyleSheet.create({
         color: COLORS.primary,
         marginLeft: 6,
     },
-
-    // MODAL
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'flex-end', // Bottom sheet style
+        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: COLORS.white,
@@ -512,7 +497,7 @@ const styles = StyleSheet.create({
         width: 45,
         height: 45,
         borderRadius: 22.5,
-        backgroundColor: COLORS.secondary + '40', // Transparencia
+        backgroundColor: COLORS.secondary + '40',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 15,

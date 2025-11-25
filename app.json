@@ -20,10 +20,13 @@
         "foregroundImage": "./src/assets/Bacuna.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": false,
-      "softwareKeyboardLayoutMode": "resize",
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
-        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.pyas.Supabase"
@@ -39,7 +42,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "La aplicación necesita acceso a tus fotos para que puedas seleccionar un avatar."
+          "photosPermission": "La aplicación necesita acceso a tus fotos para que puedas seleccionar un avatar.",
+          "cameraPermission": "La aplicación necesita acceso a tu cámara para tomar fotos."
         }
       ],
       "expo-font"

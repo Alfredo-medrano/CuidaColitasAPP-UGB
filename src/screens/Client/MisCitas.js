@@ -138,7 +138,7 @@ export default function MisCitas({ navigation }) {
 
   // Render según estado (carga/error/vacío/lista)
   const renderContent = () => {
-    if (isLoading && (!allAppointments || allAppointments.length === 0)) {
+    if (isLoading) {
       return <ActivityIndicator style={styles.stateIndicator} size="large" color={COLORS?.accent ?? '#43C0AF'} />;
     }
 

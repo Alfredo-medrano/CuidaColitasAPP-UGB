@@ -20,10 +20,9 @@ export default function TabArchivos({ petId, navigation }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [session, setSession] = useState(null); // Nuevo: estado para la sesión
+  const [session, setSession] = useState(null);
   const isFocused = useIsFocused();
 
-  // Nuevo: Obtener la sesión del usuario
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -42,7 +41,7 @@ export default function TabArchivos({ petId, navigation }) {
         .select('*')
         .eq('pet_id', petId)
         .order('uploaded_at', { ascending: false });
-      
+
       if (error) throw error;
       setFiles(data);
 
@@ -66,35 +65,46 @@ export default function TabArchivos({ petId, navigation }) {
         Alert.alert("Error", "Necesitas estar autenticado para subir archivos.");
         return;
       }
-      
+
       const result = await DocumentPicker.getDocumentAsync();
       if (result.canceled === true) {
         return;
       }
-      
+
       setUploading(true);
       const file = result.assets[0];
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      
-      // CAMBIO CLAVE: La ruta ahora incluye el UID del usuario
+
       const filePath = `${session.user.id}/${petId}/${fileName}`;
 
-      const formData = new FormData();
-      formData.append('file', {
-        uri: file.uri,
-        name: fileName,
-        type: file.mimeType,
-      });
+      console.log('[Upload] Iniciando subida...');
+      console.log('[Upload] URI:', file.uri);
+      console.log('[Upload] Path:', filePath);
 
-      // 1. Subir el archivo a Supabase Storage
+      // CAMBIO: Usar arrayBuffer en lugar de FormData
+      const response = await fetch(file.uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const fileBytes = new Uint8Array(arrayBuffer);
+
+      console.log('[Upload] Bytes leídos:', fileBytes.length);
+
+      // Subir el archivo a Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('attachments')
-        .upload(filePath, formData);
+        .upload(filePath, fileBytes, {
+          contentType: file.mimeType,
+          upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[Upload] Error en storage:', uploadError);
+        throw uploadError;
+      }
 
-      // 2. Insertar el registro en la base de datos
+      console.log('[Upload] Archivo subido a storage exitosamente');
+
+      // Insertar el registro en la base de datos
       const { error: dbError } = await supabase
         .from('medical_attachments')
         .insert({
@@ -105,19 +115,24 @@ export default function TabArchivos({ petId, navigation }) {
           file_size_bytes: file.size,
         });
 
-      if (dbError) throw dbError;
-      
+      if (dbError) {
+        console.error('[Upload] Error en DB:', dbError);
+        throw dbError;
+      }
+
+      console.log('[Upload] Registro guardado en DB exitosamente');
+
       Alert.alert("Éxito", "El archivo se ha subido correctamente.");
       fetchFiles();
 
     } catch (error) {
-      Alert.alert("Error", "No se pudo subir el archivo.");
-      console.error(error);
+      console.error('[Upload] Error completo:', error);
+      Alert.alert("Error", `No se pudo subir el archivo: ${error.message}`);
     } finally {
       setUploading(false);
     }
   };
-  
+
   const handleViewFile = async (filePath) => {
     const { data, error } = await supabase.storage.from('attachments').createSignedUrl(filePath, 60);
     if (error) {
@@ -129,29 +144,31 @@ export default function TabArchivos({ petId, navigation }) {
 
   const handleDeleteFile = async (file) => {
     Alert.alert("Confirmar Eliminación", `¿Seguro que quieres eliminar ${file.file_name}?`, [
-        {text: 'Cancelar', style: 'cancel'},
-        {text: 'Eliminar', style: 'destructive', onPress: async () => {
-            try {
-                // 1. Borrar de Storage
-                const { error: storageError } = await supabase.storage.from('attachments').remove([file.storage_path]);
-                if (storageError) throw storageError;
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar', style: 'destructive', onPress: async () => {
+          try {
+            // 1. Borrar de Storage
+            const { error: storageError } = await supabase.storage.from('attachments').remove([file.storage_path]);
+            if (storageError) throw storageError;
 
-                // 2. Borrar de la base de datos
-                const { error: dbError } = await supabase.from('medical_attachments').delete().eq('id', file.id);
-                if (dbError) throw dbError;
+            // 2. Borrar de la base de datos
+            const { error: dbError } = await supabase.from('medical_attachments').delete().eq('id', file.id);
+            if (dbError) throw dbError;
 
-                Alert.alert("Éxito", "El archivo ha sido eliminado.");
-                fetchFiles();
-            } catch (error) {
-                Alert.alert("Error", "No se pudo eliminar el archivo.");
-                console.error(error);
-            }
-        }}
+            Alert.alert("Éxito", "El archivo ha sido eliminado.");
+            fetchFiles();
+          } catch (error) {
+            Alert.alert("Error", "No se pudo eliminar el archivo.");
+            console.error(error);
+          }
+        }
+      }
     ]);
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#fff" style={{marginTop: 50}} />;
+    return <ActivityIndicator size="large" color="#fff" style={{ marginTop: 50 }} />;
   }
 
   return (
@@ -166,7 +183,7 @@ export default function TabArchivos({ petId, navigation }) {
       <FlatList
         data={files}
         keyExtractor={item => item.id}
-        renderItem={({item}) => (
+        renderItem={({ item }) => (
           <View style={styles.card}>
             <Icon name={item.file_type?.includes('pdf') ? 'file-pdf' : 'file-image'} size={24} color="#013847" />
             <View style={styles.fileInfo}>
@@ -181,14 +198,13 @@ export default function TabArchivos({ petId, navigation }) {
             </View>
           </View>
         )}
-        contentContainerStyle={{paddingHorizontal: 15}}
+        contentContainerStyle={{ paddingHorizontal: 15 }}
         ListEmptyComponent={<Text style={styles.emptyText}>No hay archivos adjuntos.</Text>}
       />
     </View>
   );
 }
 
-// --- Estilos para este componente de pestaña ---
 const styles = StyleSheet.create({
   container: { flex: 1 },
   tabHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 15, paddingTop: 20 },

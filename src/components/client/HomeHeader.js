@@ -1,7 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+
+// Función para tamaños responsivos
+const { width } = Dimensions.get('window');
+const guidelineBaseWidth = 375;
+const responsiveSize = (size) => (width / guidelineBaseWidth) * size;
 
 const HomeHeader = ({ userName, avatarUrl, onNotificationPress, onProfilePress, notificationCount }) => {
   return (
@@ -11,19 +16,19 @@ const HomeHeader = ({ userName, avatarUrl, onNotificationPress, onProfilePress, 
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
           <View style={styles.avatar}>
-            <Ionicons name="person-outline" size={24} color={COLORS.primary} />
+            <Ionicons name="person-outline" size={responsiveSize(24)} color={COLORS.primary} />
           </View>
         )}
-        <View>
-          <Text style={styles.greeting}>Hola, {userName}</Text>
-          <Text style={styles.welcome}>Bienvenido a CuidaColitas</Text>
+        <View style={styles.textContainer}>
+          <Text style={styles.greeting} numberOfLines={1}>Hola, {userName}</Text>
+          <Text style={styles.welcome} numberOfLines={1}>Bienvenido a CuidaColitas</Text>
         </View>
       </TouchableOpacity>
       <TouchableOpacity onPress={onNotificationPress} style={styles.notificationButton}>
-        <Ionicons name="notifications-outline" size={28} color={COLORS.textPrimary} />
+        <Ionicons name="notifications-outline" size={responsiveSize(28)} color={COLORS.textPrimary} />
         {notificationCount > 0 && (
           <View style={styles.notificationBadge}>
-            <Text style={styles.notificationCount}>{notificationCount}</Text>
+            <Text style={styles.notificationCount}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -36,54 +41,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: responsiveSize(20),
+    paddingVertical: responsiveSize(10),
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: responsiveSize(10),
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: responsiveSize(48),
+    height: responsiveSize(48),
+    borderRadius: responsiveSize(24),
     backgroundColor: COLORS.secondary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: responsiveSize(12),
+  },
+  textContainer: {
+    flex: 1,
   },
   greeting: {
     fontFamily: FONTS.PoppinsSemiBold,
-    fontSize: SIZES.h3,
+    fontSize: responsiveSize(18),
     color: COLORS.textPrimary,
   },
   welcome: {
     fontFamily: FONTS.PoppinsRegular,
-    fontSize: SIZES.body,
+    fontSize: responsiveSize(13),
     color: COLORS.secondary,
   },
   notificationButton: {
     position: 'relative',
-    padding: 8,
+    padding: responsiveSize(8),
   },
   notificationBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: responsiveSize(4),
+    right: responsiveSize(4),
     backgroundColor: COLORS.alert,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+    borderRadius: responsiveSize(10),
+    minWidth: responsiveSize(20),
+    height: responsiveSize(20),
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: responsiveSize(4),
     borderWidth: 2,
     borderColor: COLORS.primary,
   },
   notificationCount: {
-      color: COLORS.white,
-      fontFamily: FONTS.PoppinsBold,
-      fontSize: 12,
+    color: COLORS.white,
+    fontFamily: FONTS.PoppinsBold,
+    fontSize: responsiveSize(10),
   },
 });
 

@@ -5,6 +5,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { supabase } from '../../api/Supabase.js';
 import AuthLayout from '../../components/AuthLayout.js';
 import { UnderlineInput, PrimaryButton, EyeToggle } from '../../components/FormBits.js';
+import { validateEmail, validateRequired } from '../../utils/validation.js';
 
 export default function SignIn({ navigation }) {
   const [email, setEmail] = useState('');
@@ -19,9 +20,19 @@ export default function SignIn({ navigation }) {
     setLoading(true);
 
     try {
+      const cleanEmail = email.trim();
+
+      if (!validateRequired(cleanEmail) || !validateRequired(password)) {
+        throw new Error('Por favor completa todos los campos.');
+      }
+
+      if (!validateEmail(cleanEmail)) {
+        throw new Error('El formato del correo electrónico no es válido.');
+      }
+
       // Intenta iniciar sesión con el email y la contraseña
       const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: email.trim(), // Usamos trim() para limpiar espacios en blanco
+        email: cleanEmail,
         password,
       });
 
@@ -29,14 +40,16 @@ export default function SignIn({ navigation }) {
       if (loginError) {
         throw loginError;
       }
-      
+
       // Si el inicio de sesión es exitoso, nuestro AuthContext
       // se encargará del resto automáticamente. No necesitamos hacer más nada aquí.
 
     } catch (err) {
       // Muestra un mensaje de error amigable al usuario
       console.error('Error al iniciar sesión:', err.message);
-      setError('Email o contraseña incorrectos. Intenta de nuevo.');
+      setError(err.message === 'Invalid login credentials'
+        ? 'Email o contraseña incorrectos.'
+        : err.message);
     } finally {
       // Pase lo que pase, dejamos de mostrar el indicador de carga
       setLoading(false);

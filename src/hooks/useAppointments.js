@@ -18,8 +18,6 @@ export function useAppointments(isVet = false, initialMonth = moment()) {
 
   const fetchAppointments = useCallback(
     async (month) => {
-      if (isLoading) return; // Evitar dobles fetch simultáneos
-
       setIsLoading(true);
       setError(null);
 
@@ -67,7 +65,7 @@ export function useAppointments(isVet = false, initialMonth = moment()) {
         setIsLoading(false);
       }
     },
-    [filterColumn, initialMonth, isLoading]
+    [filterColumn, initialMonth] // ✅ FIX: Removed isLoading from dependencies
   );
 
   // Fetch inicial y cuando cambie el mes inicial

@@ -4,8 +4,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { supabase } from '../../api/Supabase.js';
 import AuthLayout from '../../components/AuthLayout.js';
 import { UnderlineInput, PrimaryButton, EyeToggle } from '../../components/FormBits.js';
-const emailOk = (e) => /\S+@\S+\.\S+/.test(e);
-const passStrong = (p) => /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$/.test(p);
+import { validateEmail, validateRequired, getPasswordError, sanitizeInput } from '../../utils/validation.js';
+
 const normalize = (s) => String(s || '').trim().toLowerCase();
 
 export default function SignUp({ navigation, route }) {
@@ -25,9 +25,14 @@ export default function SignUp({ navigation, route }) {
     setInfo('');
 
     const emailNorm = normalize(email);
-    if (!emailOk(emailNorm)) { setError('Correo inválido.'); return; }
-    if (!name) { setError('El nombre es obligatorio.'); return; }
-    if (!passStrong(password)) { setError('La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número.'); return; }
+    const nameClean = sanitizeInput(name);
+
+    if (!validateRequired(nameClean)) { setError('El nombre es obligatorio.'); return; }
+    if (!validateEmail(emailNorm)) { setError('Correo inválido.'); return; }
+
+    const passError = getPasswordError(password);
+    if (passError) { setError(passError); return; }
+
     if (password !== confirm) { setError('Las contraseñas no coinciden.'); return; }
 
     setLoading(true);
@@ -40,25 +45,23 @@ export default function SignUp({ navigation, route }) {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error("No se pudo crear el usuario en el sistema de autenticación.");
 
-      // --- ESTA CONSULTA AHORA FUNCIONARÁ ---
-      // 1. Busca el rol 'cliente' (la lógica correcta para un registro público)
+      // 1. Busca el rol 'cliente'
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
         .select('id')
-        .eq('name', 'cliente') // Corregido: busca 'cliente'
+        .eq('name', 'cliente')
         .single();
 
-      if (roleError || !roleData) throw new Error("Error al obtener el rol de cliente. (¿Habilitaste la política de lectura RLS para 'roles'?)");
+      if (roleError || !roleData) throw new Error("Error al obtener el rol de cliente.");
 
-      // 2. Inserta el perfil con el 'name' y 'role_id' correctos
+      // 2. Inserta el perfil
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({
           id: authData.user.id,
-          name: name, // Tu script SQL usa 'name'
+          name: nameClean,
           role_id: roleData.id,
         });
-      // --- FIN DE LA LÓGICA ---
 
       if (insertError) throw insertError;
 
@@ -83,7 +86,6 @@ export default function SignUp({ navigation, route }) {
       onTabChange={(t) => navigation.replace(t === 'login' ? 'SignIn' : 'SignUp', { prefillEmail: normalize(email) })}
       title="Welcome to CuidaColitas"
     >
-      {/* ... El resto de tu JSX ... */}
       <UnderlineInput
         placeholder="Nombre Completo"
         value={name}

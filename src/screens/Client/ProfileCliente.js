@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, FlatList,Platform, Dimensions, } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, FlatList, Platform, Dimensions, } from 'react-native';
 import { supabase } from '../../api/Supabase';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
 
 //función para obtener tamaños responsivos y proporcionales
 const { width } = Dimensions.get('window');
-const guidelineBaseWidth = 375; 
+const guidelineBaseWidth = 375;
 const responsiveSize = (size) => (width / guidelineBaseWidth) * size;
 
 //componentes internos 
@@ -27,36 +28,37 @@ const InfoCard = ({ title, children }) => (
 );
 
 const PetListItem = ({ pet }) => {
-    const getStatusStyle = (status) => {
-        switch (status) {
-            case 'En Tratamiento':
-                return { backgroundColor: '#CDA37B30', color: COLORS.alert };
-            default:
-                return { backgroundColor: '#43C0AF30', color: COLORS.accent };
-        }
-    };
-    const statusStyle = getStatusStyle(pet.status);
-    const age = pet.birth_date ? `${new Date().getFullYear() - new Date(pet.birth_date).getFullYear()} años` : 'N/A';
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'En Tratamiento':
+        return { backgroundColor: '#CDA37B30', color: COLORS.alert };
+      default:
+        return { backgroundColor: '#43C0AF30', color: COLORS.accent };
+    }
+  };
+  const statusStyle = getStatusStyle(pet.status);
+  const age = pet.birth_date ? `${new Date().getFullYear() - new Date(pet.birth_date).getFullYear()} años` : 'N/A';
 
-    return (
-        <View style={styles.petItem}>
-            <View style={styles.petIconContainer}>
-                <Ionicons name="paw-outline" size={responsiveSize(24)} color={COLORS.primary} />
-            </View>
-            <View style={styles.petDetails}>
-                <Text style={styles.petName}>{pet.name}</Text>
-                <Text style={styles.petInfo}>{pet.species?.name || 'N/A'} • {age}</Text>
-            </View>
-            <View style={[styles.petStatusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
-                <Text style={[styles.petStatusText, { color: statusStyle.color }]}>{pet.status || 'Saludable'}</Text>
-            </View>
-        </View>
-    );
+  return (
+    <View style={styles.petItem}>
+      <View style={styles.petIconContainer}>
+        <Ionicons name="paw-outline" size={responsiveSize(24)} color={COLORS.primary} />
+      </View>
+      <View style={styles.petDetails}>
+        <Text style={styles.petName}>{pet.name}</Text>
+        <Text style={styles.petInfo}>{pet.species?.name || 'N/A'} • {age}</Text>
+      </View>
+      <View style={[styles.petStatusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
+        <Text style={[styles.petStatusText, { color: statusStyle.color }]}>{pet.status || 'Saludable'}</Text>
+      </View>
+    </View>
+  );
 };
 
 //componente principal de la pantalla de perfil del cliente
 
 export default function ProfileCliente({ navigation }) {
+  const { avatarUrl } = useAuth();
   const [profile, setProfile] = useState(null);
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,64 +126,64 @@ export default function ProfileCliente({ navigation }) {
 
   return (
     <View style={styles.rootContainer}>
-        <SafeAreaView style={styles.safeContainer}>
-            <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+      <SafeAreaView style={styles.safeContainer}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
 
-                <View style={styles.headerContainer}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={responsiveSize(24)} color={COLORS.textPrimary} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Mi Perfil</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('EditProfileClient', { profile })} style={styles.editHeaderButton}>
-                        <Ionicons name="create-outline" size={responsiveSize(24)} color={COLORS.textPrimary} />
-                    </TouchableOpacity>
-                </View>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={responsiveSize(24)} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Mi Perfil</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('EditProfileClient', { profile })} style={styles.editHeaderButton}>
+              <Ionicons name="create-outline" size={responsiveSize(24)} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
 
-                <View style={styles.profileIdentity}>
-                    {profile.avatar_url ? (
-                        <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-                    ) : (
-                        <View style={[styles.avatar, { backgroundColor: COLORS.accent }]}>
-                            <Ionicons name="person-outline" size={responsiveSize(50)} color={COLORS.primary} />
-                        </View>
-                    )}
-                    <Text style={styles.profileName}>{profile.name || 'Nombre no disponible'}</Text>
-                    <Text style={styles.profileRole}>Cliente CuidaColitas</Text>
-                </View>
+          <View style={styles.profileIdentity}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: COLORS.accent }]}>
+                <Ionicons name="person-outline" size={responsiveSize(50)} color={COLORS.primary} />
+              </View>
+            )}
+            <Text style={styles.profileName}>{profile.name || 'Nombre no disponible'}</Text>
+            <Text style={styles.profileRole}>Cliente CuidaColitas</Text>
+          </View>
 
-                <InfoCard title="Información Personal">
-                    <InfoRow icon="mail-outline" text={profile.email} />
-                    <InfoRow icon="call-outline" text={profile.phone_number} />
-                    <InfoRow icon="location-outline" text={profile.address} />
-                </InfoCard>
+          <InfoCard title="Información Personal">
+            <InfoRow icon="mail-outline" text={profile.email} />
+            <InfoRow icon="call-outline" text={profile.phone_number} />
+            <InfoRow icon="location-outline" text={profile.address} />
+          </InfoCard>
 
-                <InfoCard title="Mis Mascotas">
-                    {pets.length > 0 ? (
-                        <FlatList
-                            data={pets}
-                            keyExtractor={(item) => item.id.toString()}
-                            renderItem={({ item }) => <PetListItem pet={item} />}
-                            scrollEnabled={false}
-                            ItemSeparatorComponent={() => <View style={styles.separator} />}
-                        />
-                    ) : (
-                        <Text style={styles.emptyText}>No tienes mascotas registradas.</Text>
-                    )}
-                </InfoCard>
+          <InfoCard title="Mis Mascotas">
+            {pets.length > 0 ? (
+              <FlatList
+                data={pets}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => <PetListItem pet={item} />}
+                scrollEnabled={false}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+              />
+            ) : (
+              <Text style={styles.emptyText}>No tienes mascotas registradas.</Text>
+            )}
+          </InfoCard>
 
-                <InfoCard title="Contacto de Emergencia">
-                    <InfoRow icon="person-outline" text={profile.emergency_name} />
-                    <InfoRow icon="call-outline" text={profile.emergency_phone} />
-                </InfoCard>
+          <InfoCard title="Contacto de Emergencia">
+            <InfoRow icon="person-outline" text={profile.emergency_name} />
+            <InfoRow icon="call-outline" text={profile.emergency_phone} />
+          </InfoCard>
 
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                    <Ionicons name="log-out-outline" size={responsiveSize(22)} color={COLORS.white} />
-                    <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-                </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={responsiveSize(22)} color={COLORS.white} />
+            <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+          </TouchableOpacity>
 
-            </ScrollView>
-        </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
@@ -189,9 +191,9 @@ export default function ProfileCliente({ navigation }) {
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
-    backgroundColor: COLORS.primary, 
+    backgroundColor: COLORS.primary,
   },
-  safeContainer: { 
+  safeContainer: {
     flex: 1,
   },
   loaderContainer: {
@@ -216,7 +218,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: FONTS.PoppinsSemiBold,
-    fontSize: responsiveSize(22), 
+    fontSize: responsiveSize(22),
     color: COLORS.textPrimary,
   },
   editHeaderButton: {
