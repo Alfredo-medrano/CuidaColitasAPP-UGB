@@ -19,7 +19,6 @@ const ProfileHeader = ({ profile, onGoBack }) => (
       <Text style={styles.profileName}>{profile.name || 'Nombre no disponible'}</Text>
       <Text style={styles.profileRole}>Cliente CuidaColitas</Text>
     </View>
-    {/* Placeholder para mantener el título centrado */}
     <View style={{ width: 24 }} />
   </View>
 );

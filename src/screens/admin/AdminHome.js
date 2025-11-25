@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/Supabase';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
@@ -93,6 +93,13 @@ export default function AdminHome({ navigation }) {
           <SummaryCard
             left="Calendario Global"
             right={<MaterialCommunityIcons name="calendar-month" size={24} color={COLORS.accent} />}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => navigation.navigate('Stats')}>
+          <SummaryCard
+            left="Estadísticas"
+            right={<MaterialCommunityIcons name="chart-bar" size={24} color={COLORS.secondary} />}
           />
         </TouchableOpacity>
 

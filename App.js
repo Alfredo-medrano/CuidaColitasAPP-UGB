@@ -11,7 +11,7 @@ import { COLORS } from './src/theme/theme';
 // --- NUESTRAS IMPORTACIONES ---
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
-// Importa todas tus pantallas como ya lo tenías
+// Importa todas tus pantallas
 import SignIn from './src/screens/Auth/Signin';
 import SignUp from './src/screens/Auth/signup';
 import ForgotPassword from './src/screens/Auth/ForgotPassword';
@@ -42,6 +42,11 @@ import DetalleCita from './src/components/DetalleCita';
 import AdminHome from './src/screens/admin/AdminHome';
 import AdminProfile from './src/screens/admin/AdminProfile';
 import GestionVets from './src/screens/admin/GestionVets';
+import EditVet from './src/screens/admin/EditVet';
+import GestionClientes from './src/screens/admin/GestionClientes';
+import DetalleCliente from './src/screens/admin/DetalleCliente';
+import CalendarioMaestro from './src/screens/admin/CalendarioMaestro';
+import AdminStats from './src/screens/admin/AdminStats';
 import ConversationListScreen from './src/screens/Chat/ConversationListScreen';
 import ChatScreen from './src/screens/Chat/ChatScreen';
 
@@ -91,6 +96,11 @@ function AppStack() {
       <Stack.Screen name="AdminHome" component={AdminHome} options={{ headerShown: false }} />
       <Stack.Screen name="AdminProfile" component={AdminProfile} options={{ title: 'Mi Perfil' }} />
       <Stack.Screen name="Vets" component={GestionVets} options={{ headerShown: false }} />
+      <Stack.Screen name="EditVet" component={EditVet} options={{ headerShown: false }} />
+      <Stack.Screen name="Clients" component={GestionClientes} options={{ headerShown: false }} />
+      <Stack.Screen name="DetalleCliente" component={DetalleCliente} options={{ headerShown: false }} />
+      <Stack.Screen name="CalendarioMaestro" component={CalendarioMaestro} options={{ headerShown: false }} />
+      <Stack.Screen name="Stats" component={AdminStats} options={{ title: 'Estadísticas' }} />
     </Stack.Navigator>
   );
 }

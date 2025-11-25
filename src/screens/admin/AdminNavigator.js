@@ -1,4 +1,3 @@
-// src/screens/admin/AdminNavigator.js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -12,14 +11,9 @@ import EditVet from './EditVet';
 import GestionClientes from './GestionClientes';
 import DetalleCliente from './DetalleCliente';
 import CalendarioMaestro from './CalendarioMaestro';
+import AdminStats from './AdminStats';
 
 const Stack = createStackNavigator();
-
-const StatsScreen = () => (
-  <View style={styles.placeholderContainer}>
-    <Text style={styles.placeholderText}>Pantalla de Estadísticas (WIP)</Text>
-  </View>
-);
 
 export default function AdminNavigator() {
   return (
@@ -83,7 +77,7 @@ export default function AdminNavigator() {
 
       <Stack.Screen
         name="Stats"
-        component={StatsScreen}
+        component={AdminStats}
         options={{ title: 'Estadísticas' }}
       />
     </Stack.Navigator>
