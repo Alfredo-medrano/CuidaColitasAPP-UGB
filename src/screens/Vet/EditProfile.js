@@ -203,8 +203,8 @@ export default function EditProfile({ route, navigation }) {
       const ext = ['png', 'webp', 'jpg', 'jpeg'].includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg';
       const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
-      // ✅ Guardar en la RAÍZ del bucket para cumplir RLS más simple: "<uid>.<ext>"
-      const filePath = `${user.id}.${ext}`;
+      // ✅ Guardar en carpeta del usuario para cumplir RLS: "<uid>/avatar_<timestamp>.<ext>"
+      const filePath = `${user.id}/avatar_${Date.now()}.${ext}`;
 
       // Subir binario
       const { error: uploadError } = await supabase.storage
@@ -287,7 +287,7 @@ export default function EditProfile({ route, navigation }) {
       }
 
       // refrescar perfil global
-      if (refetchProfile) { try { await refetchProfile(true); } catch (_) {} }
+      if (refetchProfile) { try { await refetchProfile(true); } catch (_) { } }
 
       Alert.alert('Éxito', 'Perfil guardado correctamente.');
       navigation.goBack();

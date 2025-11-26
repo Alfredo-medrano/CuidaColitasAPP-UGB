@@ -144,7 +144,8 @@ export default function EditProfileClient({ route, navigation }) {
             const ext = ['png', 'webp', 'jpg', 'jpeg'].includes(rawExt) ? (rawExt === 'jpeg' ? 'jpg' : rawExt) : 'jpg';
             const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
-            const filePath = `${user.id}.${ext}`;
+            // ✅ Guardar en carpeta del usuario para cumplir RLS: "<uid>/avatar_<timestamp>.<ext>"
+            const filePath = `${user.id}/avatar_${Date.now()}.${ext}`;
 
             // Subir binario al bucket 'attachments'
             const { error: uploadError } = await supabase.storage
