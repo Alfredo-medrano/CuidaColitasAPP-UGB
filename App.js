@@ -47,6 +47,12 @@ import GestionClientes from './src/screens/admin/GestionClientes';
 import DetalleCliente from './src/screens/admin/DetalleCliente';
 import CalendarioMaestro from './src/screens/admin/CalendarioMaestro';
 import AdminStats from './src/screens/admin/AdminStats';
+import AdminMensajes from './src/screens/admin/AdminMensajes';
+import AdminNotificaciones from './src/screens/admin/AdminNotificaciones';
+import GestionMascotas from './src/screens/admin/GestionMascotas';
+import AdminNuevaCita from './src/screens/admin/AdminNuevaCita';
+import AdminLogs from './src/screens/admin/AdminLogs';
+import ConfiguracionSistema from './src/screens/admin/ConfiguracionSistema';
 import ConversationListScreen from './src/screens/Chat/ConversationListScreen';
 import ChatScreen from './src/screens/Chat/ChatScreen';
 
@@ -101,6 +107,12 @@ function AppStack() {
       <Stack.Screen name="DetalleCliente" component={DetalleCliente} options={{ headerShown: false }} />
       <Stack.Screen name="CalendarioMaestro" component={CalendarioMaestro} options={{ headerShown: false }} />
       <Stack.Screen name="Stats" component={AdminStats} options={{ title: 'Estadísticas' }} />
+      <Stack.Screen name="AdminMensajes" component={AdminMensajes} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminNotificaciones" component={AdminNotificaciones} options={{ headerShown: false }} />
+      <Stack.Screen name="GestionMascotas" component={GestionMascotas} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminNuevaCita" component={AdminNuevaCita} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminLogs" component={AdminLogs} options={{ headerShown: false }} />
+      <Stack.Screen name="ConfiguracionSistema" component={ConfiguracionSistema} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -1,144 +1,229 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { supabase } from '../../api/Supabase';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import AdminLayout from '../../components/admin/AdminLayout';
+import StatCard from '../../components/admin/common/StatCard';
+import QuickActionCard from '../../components/admin/common/QuickActionCard';
+import LoadingState from '../../components/admin/common/LoadingState';
+import { useAdminData } from '../../hooks/admin/useAdminData';
+import { responsiveSize } from '../../utils/helpers';
 
-const PROFILE_TABLE = 'profiles';
-
-const IconBadge = ({ name, bg, color = COLORS.white }) => (
-  <View style={[styles.iconBadge, { backgroundColor: bg }]}>
-    <MaterialCommunityIcons name={name} size={28} color={color} />
-  </View>
-);
-const DashboardCard = ({ icon, iconBg, title, value }) => (
-  <View style={styles.card}>
-    <IconBadge name={icon} bg={iconBg} />
-    <View style={styles.cardTextContainer}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <Text style={styles.cardValue}>{value}</Text>
-    </View>
-  </View>
-);
-const SummaryCard = ({ left, right }) => (
-  <View style={styles.summaryCard}>
-    <Text style={styles.summaryText}>{left}</Text>
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>{right}</View>
-  </View>
-);
+// Configuración de acciones rápidas del admin
+const quickActions = [
+  { title: 'Veterinarios', icon: 'stethoscope', screen: 'Vets', color: COLORS.card },
+  { title: 'Clientes', icon: 'account-group', screen: 'Clients', color: COLORS.accent },
+  { title: 'Mascotas', icon: 'paw', screen: 'GestionMascotas', color: '#10B981' },
+  { title: 'Calendario', icon: 'calendar-month', screen: 'CalendarioMaestro', color: COLORS.secondary },
+  { title: 'Estadísticas', icon: 'chart-bar', screen: 'Stats', color: COLORS.alert },
+  { title: 'Mensajes', icon: 'message-text', screen: 'AdminMensajes', color: '#6366F1' },
+  { title: 'Notificaciones', icon: 'bell-alert', screen: 'AdminNotificaciones', color: '#F59E0B' },
+  { title: 'Logs', icon: 'file-document-outline', screen: 'AdminLogs', color: '#8B5CF6' },
+  { title: 'Configuración', icon: 'cog', screen: 'ConfiguracionSistema', color: '#64748B' },
+];
 
 export default function AdminHome({ navigation }) {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [vetCount, setVetCount] = useState(0);
-  const [clientCount, setClientCount] = useState(0);
+  const { fetchStats, refreshStats, loading, refreshing } = useAdminData();
+  const [stats, setStats] = useState({
+    vets: 0,
+    clients: 0,
+    totalUsers: 0,
+  });
 
-  const fetchCounts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: roles, error: rolesError } = await supabase
-        .from('roles').select('id,name').in('name', ['veterinario', 'cliente']);
-      if (rolesError) throw rolesError;
-
-      const vetRoleId = roles?.find(r => r.name === 'veterinario')?.id || null;
-      let cliRoleId = roles?.find(r => r.name === 'cliente')?.id || null;
-
-      if (!cliRoleId) {
-        const { data: rpcCli, error: rpcErr } = await supabase.rpc('get_cliente_role_id');
-        if (rpcErr) throw rpcErr;
-        cliRoleId = rpcCli;
-      }
-
-      const [{ count: vets, error: e1 }, { count: clients, error: e2 }] = await Promise.all([
-        supabase.from(PROFILE_TABLE).select('*', { count: 'exact', head: true }).eq('role_id', vetRoleId),
-        supabase.from(PROFILE_TABLE).select('*', { count: 'exact', head: true }).eq('role_id', cliRoleId),
-      ]);
-      if (e1) throw e1;
-      if (e2) throw e2;
-
-      setVetCount(vets || 0);
-      setClientCount(clients || 0);
-    } catch (err) {
-      console.error('AdminHome fetchCounts:', err?.message || err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  useEffect(() => {
+    loadData();
   }, []);
 
-  useEffect(() => { fetchCounts(); }, [fetchCounts]);
-  const onRefresh = () => { setRefreshing(true); fetchCounts(); };
-  const totalUsers = vetCount + clientCount;
+  const loadData = async () => {
+    const data = await fetchStats();
+    setStats({
+      vets: data.vets,
+      clients: data.clients,
+      totalUsers: data.totalUsers,
+    });
+  };
+
+  const handleRefresh = async () => {
+    const data = await refreshStats();
+    setStats({
+      vets: data.vets,
+      clients: data.clients,
+      totalUsers: data.totalUsers,
+    });
+  };
 
   return (
     <AdminLayout navigation={navigation}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 12 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.accent}
+            colors={[COLORS.accent]}
+          />
+        }
       >
-        <Text style={styles.sectionTitle}>Dashboard</Text>
-        <Text style={styles.sectionSubtitle}>Resumen de usuarios activos</Text>
-
-        <View style={styles.cardRow}>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => navigation.navigate('Vets')}>
-            <DashboardCard icon="stethoscope" iconBg={COLORS.card} title="Veterinarios" value={loading ? '—' : vetCount} />
-          </TouchableOpacity>
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => navigation.navigate('Clients')}>
-            <DashboardCard icon="account-group-outline" iconBg="#6B6B6B" title="Clientes" value={loading ? '—' : clientCount} />
-          </TouchableOpacity>
+        {/* Título de bienvenida */}
+        <View style={styles.welcomeSection}>
+          <Text style={styles.welcomeTitle}>Dashboard</Text>
+          <Text style={styles.welcomeSubtitle}>Gestiona todo el sistema desde aquí</Text>
         </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('CalendarioMaestro')}>
-          <SummaryCard
-            left="Calendario Global"
-            right={<MaterialCommunityIcons name="calendar-month" size={24} color={COLORS.accent} />}
-          />
-        </TouchableOpacity>
+        {/* Sección de Estadísticas Rápidas */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Resumen General</Text>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Stats')}>
-          <SummaryCard
-            left="Estadísticas"
-            right={<MaterialCommunityIcons name="chart-bar" size={24} color={COLORS.secondary} />}
-          />
-        </TouchableOpacity>
+          {loading ? (
+            <LoadingState type="stat" count={2} />
+          ) : (
+            <View style={styles.statsRow}>
+              <View style={{ flex: 1 }}>
+                <StatCard
+                  icon="stethoscope"
+                  iconBg={COLORS.card}
+                  title="Veterinarios"
+                  value={stats.vets}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <StatCard
+                  icon="account-group-outline"
+                  iconBg={COLORS.accent}
+                  title="Clientes"
+                  value={stats.clients}
+                />
+              </View>
+            </View>
+          )}
 
-        <SummaryCard left="Total Usuarios" right={<Text style={styles.summaryValue}>{loading ? '—' : totalUsers}</Text>} />
-        <SummaryCard
-          left="Estado Sistema"
-          right={<><View style={styles.statusDot} /><Text style={styles.statusText}>Operativo</Text></>}
-        />
+          {/* Total de usuarios */}
+          <View style={styles.totalCard}>
+            <View style={styles.totalCardLeft}>
+              <Ionicons name="people" size={24} color={COLORS.accent} />
+              <Text style={styles.totalLabel}>Total Usuarios</Text>
+            </View>
+            <Text style={styles.totalValue}>{loading ? '—' : stats.totalUsers}</Text>
+          </View>
+        </View>
 
-        {loading && <View style={{ marginTop: 8 }}><ActivityIndicator color={COLORS.accent} /></View>}
+        {/* Acciones Rápidas */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+          <View style={styles.actionsGrid}>
+            {quickActions.map((action, index) => (
+              <QuickActionCard
+                key={index}
+                icon={action.icon}
+                label={action.title}
+                color={action.color}
+                onPress={() => navigation.navigate(action.screen)}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Estado del sistema */}
+        <View style={[styles.totalCard, { marginBottom: responsiveSize(20) }]}>
+          <View style={styles.totalCardLeft}>
+            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+            <Text style={styles.totalLabel}>Estado del Sistema</Text>
+          </View>
+          <View style={styles.statusBadge}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>Operativo</Text>
+          </View>
+        </View>
       </ScrollView>
     </AdminLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: responsiveSize(20),
+  },
+  welcomeSection: {
+    marginBottom: responsiveSize(24),
+  },
+  welcomeTitle: {
+    fontSize: SIZES.h2,
+    fontFamily: FONTS.PoppinsBold,
+    color: COLORS.textPrimary,
+    marginBottom: responsiveSize(4),
+  },
+  welcomeSubtitle: {
+    fontSize: SIZES.body,
+    fontFamily: FONTS.PoppinsRegular,
+    color: COLORS.secondary,
+  },
+  section: {
+    marginBottom: responsiveSize(24),
+  },
   sectionTitle: {
-    fontSize: SIZES.h2, fontFamily: FONTS.PoppinsBold, color: COLORS.white, marginTop: 6,
+    fontSize: SIZES.h3,
+    fontFamily: FONTS.PoppinsSemiBold,
+    color: COLORS.textPrimary,
+    marginBottom: responsiveSize(16),
   },
-  sectionSubtitle: {
-    fontSize: SIZES.caption, fontFamily: FONTS.PoppinsRegular, color: COLORS.textPrimary, marginBottom: 10,
+  statsRow: {
+    flexDirection: 'row',
+    gap: responsiveSize(12),
+    marginBottom: responsiveSize(12),
   },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 10 },
-  card: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
-    paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)',
+  totalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: responsiveSize(12),
+    padding: responsiveSize(16),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  iconBadge: {
-    width: 50, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 10,
+  totalCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: responsiveSize(12),
   },
-  cardTextContainer: { flex: 1 },
-  cardTitle: { fontSize: 12, color: '#4E666B', fontFamily: FONTS.PoppinsRegular },
-  cardValue: { fontSize: 28, color: COLORS.black, fontFamily: FONTS.PoppinsBold, marginTop: 2 },
-  summaryCard: {
-    backgroundColor: COLORS.white, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)', flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 10,
+  totalLabel: {
+    fontSize: SIZES.body,
+    fontFamily: FONTS.PoppinsSemiBold,
+    color: COLORS.black,
   },
-  summaryValue: { fontSize: 18, color: COLORS.black, fontFamily: FONTS.PoppinsBold },
-  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent, marginRight: 6 },
-  statusText: { fontSize: SIZES.body, color: COLORS.black, fontFamily: FONTS.PoppinsSemiBold },
+  totalValue: {
+    fontSize: SIZES.h2,
+    fontFamily: FONTS.PoppinsBold,
+    color: COLORS.black,
+  },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B98120',
+    paddingHorizontal: responsiveSize(12),
+    paddingVertical: responsiveSize(6),
+    borderRadius: responsiveSize(12),
+  },
+  statusDot: {
+    width: responsiveSize(8),
+    height: responsiveSize(8),
+    borderRadius: responsiveSize(4),
+    backgroundColor: '#10B981',
+    marginRight: responsiveSize(6),
+  },
+  statusText: {
+    fontSize: SIZES.caption,
+    fontFamily: FONTS.PoppinsSemiBold,
+    color: '#10B981',
+  },
 });

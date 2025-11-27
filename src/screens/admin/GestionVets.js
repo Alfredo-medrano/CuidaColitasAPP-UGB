@@ -1,274 +1,182 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES, FONTS } from '../../theme/theme';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../api/Supabase';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AdminLayout from '../../components/admin/AdminLayout';
+import SearchBar from '../../components/admin/common/SearchBar';
+import UserCard from '../../components/admin/common/UserCard';
+import LoadingState from '../../components/admin/common/LoadingState';
+import EmptyState from '../../components/admin/common/EmptyState';
 import NewVetModal from '../../components/admin/NewVetModal';
-
-const VetCard = ({ vet, onEdit, onDeactivate }) => {
-  const isActive = vet.is_verified;
-  return (
-    <View style={styles.card}>
-      <Text style={styles.vetName}>{vet.name || 'Nombre no disponible'}</Text>
-      <Text style={styles.vetSpecialty}>{vet.specialties ? vet.specialties.join(', ') : 'Especialidad no definida'}</Text>
-
-      <View style={[styles.statusContainer, isActive ? styles.statusActive : styles.statusPending]}>
-        <Text style={[styles.statusText, isActive ? styles.statusActiveText : styles.statusPendingText]}>
-          {isActive ? 'Verificado' : 'Pendiente'}
-        </Text>
-      </View>
-
-      <View style={styles.infoRow}>
-        <Ionicons name="call-outline" size={16} color={COLORS.gray} />
-        <Text style={styles.infoText}>{vet.phone_number || 'Sin teléfono'}</Text>
-      </View>
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={[styles.button, styles.editButton]} onPress={onEdit}>
-          <Ionicons name="pencil" size={16} color={COLORS.primary} />
-          <Text style={[styles.buttonText, styles.editButtonText]}>Editar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={onDeactivate}>
-          <Ionicons name="trash" size={16} color={COLORS.red} />
-          <Text style={[styles.buttonText, styles.deleteButtonText]}>
-            {isActive ? 'Desactivar' : 'Re-Activar'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
+import { useAdminData } from '../../hooks/admin/useAdminData';
+import { useSearch } from '../../hooks/admin/useSearch';
+import { supabase } from '../../api/Supabase';
 
 export default function GestionVets({ navigation }) {
+  const { fetchVets, refreshVets, loading } = useAdminData();
   const [vets, setVets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [numColumns, setNumColumns] = useState(2); 
-  const [refreshing, setRefreshing] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);  
+  const [modalVisible, setModalVisible] = useState(false);
+  const { query, setQuery, filteredData, clearSearch } = useSearch(vets, ['name', 'email', 'phone_number', 'college_id']);
 
-  useEffect(() => {
-    const updateColumns = () => {
-      const screenWidth = Dimensions.get('window').width;
-      setNumColumns(screenWidth > 600 ? 2 : 1); 
-    };
+  useFocusEffect(
+    React.useCallback(() => {
+      loadVets();
+    }, [])
+  );
 
-    // Establecer el número de columnas cuando se cambia el tamaño de la pantalla
-    updateColumns();
-    const subscription = Dimensions.addEventListener('change', updateColumns);
-
-    return () => {
-      subscription.remove(); 
-    };
-  }, []);
-
-  useFocusEffect(useCallback(() => { fetchVets(); }, []));
-
-  const fetchVets = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(`id, name, phone_number, specialties, is_verified, roles ( name )`)
-      .eq('roles.name', 'veterinario');
-    if (error) {
-      console.error('Error cargando veterinarios:', error.message);
-      Alert.alert('Error', 'No se pudieron cargar los veterinarios.');
-    } else {
-      setVets(data || []);
-    }
-    setLoading(false);
+  const loadVets = async () => {
+    const data = await fetchVets();
+    setVets(data);
   };
 
-  const handleEdit = (vet) => navigation.navigate('EditVet', { profileId: vet.id });
-  const handleDeactivate = async (vet) => {
-    const newStatus = !vet.is_verified;
-    const actionText = newStatus ? 'verificar' : 'desactivar';
-    const { error } = await supabase.from('profiles').update({ is_verified: newStatus }).eq('id', vet.id);
-    if (error) Alert.alert('Error', `No se pudo ${actionText} al veterinario.`);
-    else fetchVets();
+  const handleRefresh = async () => {
+    const data = await refreshVets();
+    setVets(data);
+  };
+
+  const handleEdit = (vet) => {
+    navigation.navigate('EditVet', { vetId: vet.id });
+  };
+
+  const handleToggleActive = async (vet) => {
+    const action = vet.is_active === false ? 'reactivar' : 'desactivar';
+    Alert.alert(
+      `${action.charAt(0).toUpperCase() + action.slice(1)} Veterinario`,
+      `¿Estás seguro de ${action} a ${vet.name}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: action.charAt(0).toUpperCase() + action.slice(1),
+          style: vet.is_active === false ? 'default' : 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.rpc(
+                vet.is_active === false ? 'reactivate_user' : 'deactivate_user',
+                { user_id: vet.id }
+              );
+              if (error) throw error;
+              Alert.alert('Éxito', `Veterinario ${action === 'desactivar' ? 'desactivado' : 'reactivado'} correctamente`);
+              loadVets();
+            } catch (error) {
+              console.error(error);
+              Alert.alert('Error', `No se pudo ${action} el veterinario`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDelete = (vet) => {
+    Alert.alert(
+      '⚠️ Eliminar Permanentemente',
+      `Esta acción BORRARÁ todos los datos de ${vet.name} y NO se puede deshacer.\n\n¿Estás completamente seguro?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase.rpc('delete_veterinarian_permanently', {
+                p_vet_id: vet.id,
+              });
+              if (error) throw error;
+              Alert.alert('Éxito', 'Veterinario eliminado permanentemente');
+              loadVets();
+            } catch (error) {
+              console.error(error);
+              Alert.alert('Error', 'No se pudo eliminar el veterinario: ' + (error.message || 'Error desconocido'));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    loadVets();
   };
 
   return (
     <AdminLayout navigation={navigation}>
       <View style={styles.headerContainer}>
-        <Text style={styles.listHeader}>Veterinarios ({vets.length} registrados)</Text>
-
-        <TouchableOpacity style={styles.addVetButton} onPress={() => setModalVisible(true)}>
-          <Text style={styles.addVetButtonText}>Agregar Nuevo</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Gestión de Veterinarios</Text>
+        <Text style={styles.headerSubtitle}>{vets.length} registrados</Text>
       </View>
 
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Buscar por nombre, email o teléfono..."
+        onClear={clearSearch}
+      />
+
+      <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
+        <MaterialCommunityIcons name="plus-circle" size={24} color={COLORS.white} />
+        <Text style={styles.addButtonText}>Nuevo Veterinario</Text>
+      </TouchableOpacity>
+
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <LoadingState type="card" count={5} />
+      ) : filteredData.length === 0 ? (
+        <EmptyState
+          icon="stethoscope"
+          title={query ? 'Sin resultados' : 'No hay veterinarios'}
+          message={query ? 'No se encontraron veterinarios que coincidan con tu búsqueda' : 'Agrega tu primer veterinario'}
+          action={!query ? { label: 'Agregar Veterinario', onPress: () => setModalVisible(true) } : null}
+        />
       ) : (
         <FlatList
-          data={vets}
-          keyExtractor={(item) => String(item.id)}
+          data={filteredData}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <VetCard
-              vet={item}
-              onEdit={() => handleEdit(item)}
-              onDeactivate={() => handleDeactivate(item)}
+            <UserCard
+              user={item}
+              variant="vet"
+              onPress={() => handleEdit(item)}
+              actions={[
+                { icon: 'create-outline', onPress: () => handleEdit(item), color: COLORS.primary },
+                {
+                  icon: item.is_active === false ? 'checkmark-circle-outline' : 'pause-circle-outline',
+                  onPress: () => handleToggleActive(item),
+                  color: item.is_active === false ? '#4CAF50' : '#FF9800',
+                },
+                { icon: 'trash-outline', onPress: () => handleDelete(item), color: '#F44336' },
+              ]}
             />
           )}
-          numColumns={numColumns} 
-          key={numColumns} 
-          columnWrapperStyle={numColumns > 1 ? styles.cardRow : null} 
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No hay veterinarios registrados.</Text>
-            </View>
-          }
-          contentContainerStyle={{ paddingBottom: 12 }}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          onRefresh={handleRefresh}
+          refreshing={false}
         />
       )}
-      <NewVetModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+
+      <NewVetModal visible={modalVisible} onClose={handleModalClose} />
     </AdminLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  listHeader: {
-    fontFamily: 'Poppins-SemiBold', 
-    fontSize: SIZES.h3, 
-    color: COLORS.white, 
-    marginBottom: 12,
-  },
-  headerContainer: {
+  headerContainer: { marginBottom: 20 },
+  headerTitle: { fontFamily: FONTS.PoppinsBold, fontSize: SIZES.h2, color: COLORS.white },
+  headerSubtitle: { fontFamily: FONTS.PoppinsRegular, fontSize: SIZES.body4, color: COLORS.textPrimary },
+  addButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SIZES.padding,
-  },
-  addVetButton: {
     backgroundColor: COLORS.accent,
-    paddingVertical: 5,
-    paddingHorizontal: 5,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginBottom: 20,
     justifyContent: 'center',
   },
-  addVetButtonText: {
-    color: COLORS.white,
+  addButtonText: {
     fontFamily: FONTS.PoppinsSemiBold,
-    fontSize: SIZES.h4,
-  },
-  emptyContainer: { marginTop: SIZES.padding * 2, alignItems: 'center' },
-  emptyText: { fontFamily: 'Poppins-Regular', fontSize: SIZES.body3, color: COLORS.gray },
-  // Resto de estilos...
-  cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: SIZES.padding,
-  },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 5,
-    padding: 2,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    flex: 1, 
-    marginRight: SIZES.padding, 
-  },
-  vetName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: SIZES.h4,
-    color: COLORS.primary,
-    marginBottom: 4,
-    underline: true,
-    textDecorationLine: 'underline',
-    textDecorationColor: COLORS.accent,
-    textDecorationStyle: 'solid',
-    textDecorationThickness: 1,
-  },
-  vetSpecialty: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: SIZES.body4,
-    color: COLORS.gray,
-    marginBottom: 8,
-  },
-  statusContainer: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  statusActive: {
-    backgroundColor: COLORS.lightGreen,
-  },
-  statusPending: {
-    backgroundColor: COLORS.lightRed,
-  },
-  statusText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: SIZES.body5,
-  },
-  statusActiveText: {
-    color: COLORS.accent,
-  },
-  statusPendingText: {
-    color: COLORS.red,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  infoText: {
-    fontFamily: 'Poppins-Regular',
-    color: COLORS.text,
-    marginLeft: 8,
-    fontSize: SIZES.body5,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-    paddingTop: 12,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 10,
-  },
-  editButton: {
-    backgroundColor: COLORS.secondary,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.lightRed,
-  },
-  buttonText: {
-    fontFamily: 'Poppins-SemiBold',
-    marginLeft: 6,
-    fontSize: SIZES.body5,
-  },
-  editButtonText: {
-    color: COLORS.primary,
-  },
-  deleteButtonText: {
-    color: COLORS.red,
-  },
-  emptyContainer: {
-    marginTop: SIZES.padding * 2,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: 'Poppins-Regular',
     fontSize: SIZES.body3,
-    color: COLORS.gray,
+    color: COLORS.white,
+    marginLeft: 8,
   },
 });

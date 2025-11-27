@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../api/Supabase';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 
-const FormInput = ({ label, value, onChangeText, placeholder, multiline = false }) => (
+const FormInput = ({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }) => (
     <View style={styles.inputGroup}>
         <Text style={styles.label}>{label}</Text>
         <TextInput
@@ -14,31 +15,67 @@ const FormInput = ({ label, value, onChangeText, placeholder, multiline = false 
             placeholder={placeholder}
             placeholderTextColor={COLORS.gray}
             multiline={multiline}
+            keyboardType={keyboardType}
         />
     </View>
 );
 
 export default function EditVet({ route, navigation }) {
-    const { profileId } = route.params;
+    const { vetId } = route.params || {};
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [clinics, setClinics] = useState([]);
 
     const [formData, setFormData] = useState({
         name: '',
         phone_number: '',
-        specialties: '', // Se manejará como string separado por comas para simplificar
+        college_id: '',
+        address: '',
+        title: '',
+        specialties: '',
+        clinic_id: null,
     });
 
     useEffect(() => {
-        fetchVetDetails();
+        loadData();
     }, []);
+
+    const loadData = async () => {
+        try {
+            // Cargar datos del veterinario y clínicas en paralelo
+            const [vetData, clinicsData] = await Promise.all([
+                fetchVetDetails(),
+                fetchClinics()
+            ]);
+        } catch (error) {
+            console.error('Error loading data:', error);
+        }
+    };
+
+    const fetchClinics = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('clinics')
+                .select('id, name')
+                .order('name');
+
+            if (error) throw error;
+            setClinics(data || []);
+        } catch (error) {
+            console.error('Error fetching clinics:', error);
+        }
+    };
 
     const fetchVetDetails = async () => {
         try {
+            if (!vetId) {
+                throw new Error('ID de veterinario no proporcionado');
+            }
+
             const { data, error } = await supabase
                 .from('profiles')
-                .select('name, phone_number, specialties')
-                .eq('id', profileId)
+                .select('name, phone_number, college_id, address, title, specialties, clinic_id')
+                .eq('id', vetId)
                 .single();
 
             if (error) throw error;
@@ -46,7 +83,11 @@ export default function EditVet({ route, navigation }) {
             setFormData({
                 name: data.name || '',
                 phone_number: data.phone_number || '',
+                college_id: data.college_id || '',
+                address: data.address || '',
+                title: data.title || '',
                 specialties: data.specialties ? data.specialties.join(', ') : '',
+                clinic_id: data.clinic_id || null,
             });
         } catch (error) {
             console.error('Error fetching vet details:', error);
@@ -58,8 +99,17 @@ export default function EditVet({ route, navigation }) {
     };
 
     const handleUpdate = async () => {
+        // Validaciones básicas
         if (!formData.name.trim()) {
             Alert.alert('Error', 'El nombre es obligatorio.');
+            return;
+        }
+        if (!formData.phone_number.trim()) {
+            Alert.alert('Error', 'El teléfono es obligatorio.');
+            return;
+        }
+        if (!formData.college_id.trim()) {
+            Alert.alert('Error', 'El número de colegiado es obligatorio.');
             return;
         }
 
@@ -74,11 +124,16 @@ export default function EditVet({ route, navigation }) {
             const { error } = await supabase
                 .from('profiles')
                 .update({
-                    name: formData.name,
-                    phone_number: formData.phone_number,
-                    specialties: specialtiesArray,
+                    name: formData.name.trim(),
+                    phone_number: formData.phone_number.trim(),
+                    college_id: formData.college_id.trim(),
+                    address: formData.address.trim() || null,
+                    title: formData.title.trim() || null,
+                    specialties: specialtiesArray.length > 0 ? specialtiesArray : null,
+                    clinic_id: formData.clinic_id || null,
+                    updated_at: new Date().toISOString(),
                 })
-                .eq('id', profileId);
+                .eq('id', vetId);
 
             if (error) throw error;
 
@@ -112,18 +167,45 @@ export default function EditVet({ route, navigation }) {
             </View>
 
             <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Información Personal</Text>
+
                 <FormInput
-                    label="Nombre Completo"
+                    label="Nombre Completo *"
                     value={formData.name}
                     onChangeText={(text) => setFormData({ ...formData, name: text })}
-                    placeholder="Ej. Dr. Juan Pérez"
+                    placeholder="Ej. Dr. Juan Pérez Gómez"
                 />
 
                 <FormInput
-                    label="Teléfono"
+                    label="Teléfono *"
                     value={formData.phone_number}
                     onChangeText={(text) => setFormData({ ...formData, phone_number: text })}
                     placeholder="Ej. +503 1234 5678"
+                    keyboardType="phone-pad"
+                />
+
+                <FormInput
+                    label="Nº Colegiado *"
+                    value={formData.college_id}
+                    onChangeText={(text) => setFormData({ ...formData, college_id: text })}
+                    placeholder="Ej. COV-28-5678"
+                />
+
+                <FormInput
+                    label="Dirección"
+                    value={formData.address}
+                    onChangeText={(text) => setFormData({ ...formData, address: text })}
+                    placeholder="Ej. Calle Principal #123, Ciudad"
+                    multiline
+                />
+
+                <Text style={styles.sectionTitle}>Información Profesional</Text>
+
+                <FormInput
+                    label="Título/Especialidad"
+                    value={formData.title}
+                    onChangeText={(text) => setFormData({ ...formData, title: text })}
+                    placeholder="Ej. Medicina General Veterinaria"
                 />
 
                 <FormInput
@@ -134,6 +216,22 @@ export default function EditVet({ route, navigation }) {
                     multiline
                 />
 
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Clínica Asignada</Text>
+                    <View style={styles.pickerContainer}>
+                        <Picker
+                            selectedValue={formData.clinic_id}
+                            onValueChange={(value) => setFormData({ ...formData, clinic_id: value })}
+                            style={styles.picker}
+                        >
+                            <Picker.Item label="Sin clínica asignada" value={null} />
+                            {clinics.map((clinic) => (
+                                <Picker.Item key={clinic.id} label={clinic.name} value={clinic.id} />
+                            ))}
+                        </Picker>
+                    </View>
+                </View>
+
                 <TouchableOpacity
                     style={[styles.saveButton, saving && styles.disabledButton]}
                     onPress={handleUpdate}
@@ -142,7 +240,10 @@ export default function EditVet({ route, navigation }) {
                     {saving ? (
                         <ActivityIndicator color={COLORS.white} />
                     ) : (
-                        <Text style={styles.saveButtonText}>Guardar Cambios</Text>
+                        <>
+                            <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+                            <Text style={styles.saveButtonText}>Guardar Cambios</Text>
+                        </>
                     )}
                 </TouchableOpacity>
             </View>
@@ -187,6 +288,16 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
+    sectionTitle: {
+        fontFamily: FONTS.PoppinsSemiBold,
+        fontSize: SIZES.h3,
+        color: COLORS.primary,
+        marginTop: 10,
+        marginBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+        paddingBottom: 5,
+    },
     inputGroup: {
         marginBottom: 20,
     },
@@ -198,7 +309,7 @@ const styles = StyleSheet.create({
     },
     input: {
         borderWidth: 1,
-        borderColor: COLORS.lightGray,
+        borderColor: COLORS.lightGray || '#E0E0E0',
         borderRadius: 8,
         padding: 12,
         fontFamily: FONTS.PoppinsRegular,
@@ -210,12 +321,24 @@ const styles = StyleSheet.create({
         minHeight: 80,
         textAlignVertical: 'top',
     },
+    pickerContainer: {
+        borderWidth: 1,
+        borderColor: COLORS.lightGray || '#E0E0E0',
+        borderRadius: 8,
+        backgroundColor: '#FAFAFA',
+        overflow: 'hidden',
+    },
+    picker: {
+        height: 50,
+    },
     saveButton: {
         backgroundColor: COLORS.accent,
         borderRadius: 8,
         paddingVertical: 14,
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 20,
+        flexDirection: 'row',
+        justifyContent: 'center',
     },
     disabledButton: {
         opacity: 0.7,
