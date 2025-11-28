@@ -1,6 +1,6 @@
 // EditProfile.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -320,114 +320,120 @@ export default function EditProfile({ route, navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
-        {/* --- SECCIÓN FOTO DE PERFIL --- */}
-        <View style={[styles.card, styles.cardAvatar]}>
-          <Text style={styles.cardTitle}>Foto de Perfil</Text>
-          <View style={styles.avatarSection}>
-            <TouchableOpacity onPress={pickImage} disabled={uploading} style={styles.avatarWrapper}>
-              <View style={[styles.avatarCircle, { backgroundColor: COLORS.accent }]}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Ionicons name="bandage" size={40} color={COLORS.white} />
-                )}
-              </View>
-              {uploading && (
-                <View style={styles.avatarOverlay}>
-                  <ActivityIndicator color={COLORS.white} size="large" />
+          {/* --- SECCIÓN FOTO DE PERFIL --- */}
+          <View style={[styles.card, styles.cardAvatar]}>
+            <Text style={styles.cardTitle}>Foto de Perfil</Text>
+            <View style={styles.avatarSection}>
+              <TouchableOpacity onPress={pickImage} disabled={uploading} style={styles.avatarWrapper}>
+                <View style={[styles.avatarCircle, { backgroundColor: COLORS.accent }]}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <Ionicons name="bandage" size={40} color={COLORS.white} />
+                  )}
                 </View>
+                {uploading && (
+                  <View style={styles.avatarOverlay}>
+                    <ActivityIndicator color={COLORS.white} size="large" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage} disabled={uploading}>
+                <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
+                <Text style={styles.changePhotoButtonText}>Cambiar Foto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* --- SECCIÓN INFORMACIÓN PROFESIONAL --- */}
+          <View style={[styles.card, styles.cardInfo]}>
+            <Text style={styles.cardTitle}>Información Profesional</Text>
+
+            <View style={styles.row}>
+              <FormInput label="Nombre" value={name} onChangeText={setName} placeholder="Carlos" />
+              <FormInput label="Apellidos" value={lastName} onChangeText={setLastName} placeholder="González Ruiz" />
+            </View>
+
+            <FormInput
+              label="Especialidad"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Medicina General Veterinaria"
+            />
+
+            <View style={styles.row}>
+              <FormInput
+                label="Email"
+                value={session?.user?.email || 'carlos.gonzalez@cuidacolitas.com'}
+                editable={false}
+              />
+              <FormInput
+                label="Teléfono"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                placeholder="+34 911 123 456"
+              />
+            </View>
+
+            <View style={styles.row}>
+              <FormInput
+                label="Nº Colegiado"
+                value={collegeId}
+                onChangeText={setCollegeId}
+                placeholder="COV-28-5678"
+              />
+              <FormInput
+                label="Clínica"
+                value={clinicName}
+                onChangeText={setClinicName}
+                placeholder="Clínica Veterinaria C"
+                editable={false}
+              />
+            </View>
+
+            <FormInput
+              label="Dirección"
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Calle Veterinarios 123, Madrid"
+            />
+          </View>
+
+          {/* --- BOTONES DE ACCIÓN --- */}
+          <View style={styles.actionButtons}>
+            <Pressable
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => navigation.goBack()}
+              disabled={saving || uploading}
+            >
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.button, styles.saveButton, (saving || uploading) && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={saving || uploading}
+            >
+              {saving ? (
+                <ActivityIndicator color={COLORS.primary} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.primary} style={{ marginRight: 10 }} />
+                  <Text style={styles.saveButtonText}>Guardar Cambios</Text>
+                </>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage} disabled={uploading}>
-              <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.changePhotoButtonText}>Cambiar Foto</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* --- SECCIÓN INFORMACIÓN PROFESIONAL --- */}
-        <View style={[styles.card, styles.cardInfo]}>
-          <Text style={styles.cardTitle}>Información Profesional</Text>
-
-          <View style={styles.row}>
-            <FormInput label="Nombre" value={name} onChangeText={setName} placeholder="Carlos" />
-            <FormInput label="Apellidos" value={lastName} onChangeText={setLastName} placeholder="González Ruiz" />
+            </Pressable>
           </View>
 
-          <FormInput
-            label="Especialidad"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Medicina General Veterinaria"
-          />
-
-          <View style={styles.row}>
-            <FormInput
-              label="Email"
-              value={session?.user?.email || 'carlos.gonzalez@cuidacolitas.com'}
-              editable={false}
-            />
-            <FormInput
-              label="Teléfono"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="+34 911 123 456"
-            />
-          </View>
-
-          <View style={styles.row}>
-            <FormInput
-              label="Nº Colegiado"
-              value={collegeId}
-              onChangeText={setCollegeId}
-              placeholder="COV-28-5678"
-            />
-            <FormInput
-              label="Clínica"
-              value={clinicName}
-              onChangeText={setClinicName}
-              placeholder="Clínica Veterinaria C"
-              editable={false}
-            />
-          </View>
-
-          <FormInput
-            label="Dirección"
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Calle Veterinarios 123, Madrid"
-          />
-        </View>
-
-        {/* --- BOTONES DE ACCIÓN --- */}
-        <View style={styles.actionButtons}>
-          <Pressable
-            style={[styles.button, styles.cancelButton]}
-            onPress={() => navigation.goBack()}
-            disabled={saving || uploading}
-          >
-            <Text style={styles.cancelButtonText}>Cancelar</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.button, styles.saveButton, (saving || uploading) && styles.buttonDisabled]}
-            onPress={handleSave}
-            disabled={saving || uploading}
-          >
-            {saving ? (
-              <ActivityIndicator color={COLORS.primary} />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.primary} style={{ marginRight: 10 }} />
-                <Text style={styles.saveButtonText}>Guardar Cambios</Text>
-              </>
-            )}
-          </Pressable>
-        </View>
-
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

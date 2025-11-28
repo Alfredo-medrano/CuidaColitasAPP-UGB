@@ -8,6 +8,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import HomeHeader from '../../components/client/HomeHeader';
 import NotificationCard from '../../components/client/NotificationCard';
 import ActionButton from '../../components/client/ActionButton';
+import FloatingChatButton from '../../components/shared/FloatingChatButton';
 
 // Configuración de acciones rápidas
 const quickActions = [
@@ -86,6 +87,7 @@ export default function ClienteHome({ navigation }) {
           </View>
         </View>
       </ScrollView>
+      <FloatingChatButton />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../api/Supabase';
 
@@ -28,7 +28,7 @@ export default function NuevoPaciente({ navigation }) {
           .select('id, name')
           .eq('role_id', roleData.id)
           .order('name', { ascending: true });
-        
+
         if (clientError) throw clientError;
         setClients(clientData);
 
@@ -60,7 +60,7 @@ export default function NuevoPaciente({ navigation }) {
           breed,
           sex,
           owner_id: selectedClientId,
-          primary_vet_id: vetUser.id,  
+          primary_vet_id: vetUser.id,
         });
 
       if (error) throw error;
@@ -82,56 +82,62 @@ export default function NuevoPaciente({ navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Nuevo Paciente</Text>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Dueño del Paciente</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedClientId}
-            onValueChange={(itemValue) => setSelectedClientId(itemValue)}
-          >
-            <Picker.Item label="-- Elige un cliente --" value={null} />
-            {clients.map((client) => (
-              <Picker.Item key={client.id} label={client.name} value={client.id} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Información de la Mascota</Text>
-        <TextInput style={styles.input} placeholder="Nombre de la mascota" value={petName} onChangeText={setPetName} />
-        
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={speciesId} onValueChange={(itemValue) => setSpeciesId(itemValue)}>
-            <Picker.Item label="Seleccionar especie..." value={null} />
-            {speciesList.map(specie => (
-              <Picker.Item key={specie.id} label={specie.name} value={specie.id} />
-            ))}
-          </Picker>
-        </View>
-        
-        <TextInput style={styles.input} placeholder="Raza" value={breed} onChangeText={setBreed} />
-
-        <View style={styles.pickerContainer}>
-            <Picker selectedValue={sex} onValueChange={(itemValue) => setSex(itemValue)}>
-            <Picker.Item label="Seleccionar sexo..." value="" />
-            <Picker.Item label="Macho" value="Macho" />
-            <Picker.Item label="Hembra" value="Hembra" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+        <Text style={styles.title}>Nuevo Paciente</Text>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Dueño del Paciente</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedClientId}
+              onValueChange={(itemValue) => setSelectedClientId(itemValue)}
+            >
+              <Picker.Item label="-- Elige un cliente --" value={null} />
+              {clients.map((client) => (
+                <Picker.Item key={client.id} label={client.name} value={client.id} />
+              ))}
             </Picker>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.buttonsContainer}>
-        <Pressable style={styles.cancelButton} onPress={() => navigation.goBack()}>
-          <Text style={[styles.buttonText, {color: '#333'}]}>Cancelar</Text>
-        </Pressable>
-        <Pressable style={styles.createButton} onPress={handleCreatePaciente} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear Paciente</Text>}
-        </Pressable>
-      </View>
-    </ScrollView>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Información de la Mascota</Text>
+          <TextInput style={styles.input} placeholder="Nombre de la mascota" value={petName} onChangeText={setPetName} />
+
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={speciesId} onValueChange={(itemValue) => setSpeciesId(itemValue)}>
+              <Picker.Item label="Seleccionar especie..." value={null} />
+              {speciesList.map(specie => (
+                <Picker.Item key={specie.id} label={specie.name} value={specie.id} />
+              ))}
+            </Picker>
+          </View>
+
+          <TextInput style={styles.input} placeholder="Raza" value={breed} onChangeText={setBreed} />
+
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={sex} onValueChange={(itemValue) => setSex(itemValue)}>
+              <Picker.Item label="Seleccionar sexo..." value="" />
+              <Picker.Item label="Macho" value="Macho" />
+              <Picker.Item label="Hembra" value="Hembra" />
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.buttonsContainer}>
+          <Pressable style={styles.cancelButton} onPress={() => navigation.goBack()}>
+            <Text style={[styles.buttonText, { color: '#333' }]}>Cancelar</Text>
+          </Pressable>
+          <Pressable style={styles.createButton} onPress={handleCreatePaciente} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear Paciente</Text>}
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

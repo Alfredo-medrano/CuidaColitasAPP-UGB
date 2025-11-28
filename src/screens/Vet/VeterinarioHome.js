@@ -6,11 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import { useVeterinarioHome } from '../../hooks/useVeterinarioHome';
 import { HomeHeader, NotificationCard, QuickActionsGrid } from '../../components/vet/VetHomeComponents';
-import { useAuth } from '../../context/AuthContext'; 
+import { useAuth } from '../../context/AuthContext';
+import FloatingChatButton from '../../components/shared/FloatingChatButton';
 
 export default function VeterinarioHome({ navigation }) {
   const { profile, notifications, loading, refetch, unreadCount } = useVeterinarioHome();
-  const { avatarUrl } = useAuth(); 
+  const { avatarUrl } = useAuth();
 
   const handleSeeAll = useCallback(() => {
     navigation.navigate('Notificaciones');
@@ -86,6 +87,7 @@ export default function VeterinarioHome({ navigation }) {
         <Text style={styles.actionsTitle}>Acciones Rápidas</Text>
         <QuickActionsGrid navigation={navigation} />
       </ScrollView>
+      <FloatingChatButton />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, ActivityIndicator, Image, TouchableOpacity, StatusBar, Platform, Dimensions, KeyboardAvoidingView } from 'react-native';
 import { supabase } from '../../api/Supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -230,44 +230,50 @@ export default function EditProfileClient({ route, navigation }) {
                     <View style={styles.headerButton} />
                 </View>
 
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <View style={styles.avatarSection}>
-                        <TouchableOpacity onPress={pickImage} disabled={uploading}>
-                            <Image
-                                source={avatarUrl ? { uri: avatarUrl } : require('../../assets/Perrito_blanco.png')}
-                                style={styles.avatar}
-                            />
-                            {uploading && (
-                                <View style={styles.avatarOverlay}>
-                                    <ActivityIndicator color={COLORS.white} />
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage} disabled={uploading}>
-                            <Ionicons name="camera-outline" size={responsiveSize(20)} color={COLORS.primary} />
-                            <Text style={styles.changePhotoButtonText}>Cambiar Foto</Text>
-                        </TouchableOpacity>
-                    </View>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                >
+                    <ScrollView contentContainerStyle={styles.scrollContent}>
+                        <View style={styles.avatarSection}>
+                            <TouchableOpacity onPress={pickImage} disabled={uploading}>
+                                <Image
+                                    source={avatarUrl ? { uri: avatarUrl } : require('../../assets/Perrito_blanco.png')}
+                                    style={styles.avatar}
+                                />
+                                {uploading && (
+                                    <View style={styles.avatarOverlay}>
+                                        <ActivityIndicator color={COLORS.white} />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.changePhotoButton} onPress={pickImage} disabled={uploading}>
+                                <Ionicons name="camera-outline" size={responsiveSize(20)} color={COLORS.primary} />
+                                <Text style={styles.changePhotoButtonText}>Cambiar Foto</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                    <View style={styles.formSection}>
-                        <Text style={styles.sectionTitle}>Información Personal</Text>
-                        <FormInput label="Nombre(s) y Apellido(s)" value={name} onChangeText={setName} placeholder="Tu nombre completo" />
-                        <FormInput label="Email" value={initialProfile?.email || ''} editable={false} />
-                        <FormInput label="Teléfono" value={phone} onChangeText={setPhone} placeholder="Tu número de teléfono" keyboardType="phone-pad" />
-                        <FormInput label="Dirección" value={address} onChangeText={setAddress} placeholder="Tu dirección" />
-                    </View>
+                        <View style={styles.formSection}>
+                            <Text style={styles.sectionTitle}>Información Personal</Text>
+                            <FormInput label="Nombre(s) y Apellido(s)" value={name} onChangeText={setName} placeholder="Tu nombre completo" />
+                            <FormInput label="Email" value={initialProfile?.email || ''} editable={false} />
+                            <FormInput label="Teléfono" value={phone} onChangeText={setPhone} placeholder="Tu número de teléfono" keyboardType="phone-pad" />
+                            <FormInput label="Dirección" value={address} onChangeText={setAddress} placeholder="Tu dirección" />
+                        </View>
 
-                    <View style={styles.formSection}>
-                        <Text style={styles.sectionTitle}>Contacto de Emergencia</Text>
-                        <FormInput label="Nombre del Contacto" value={emergencyName} onChangeText={setEmergencyName} placeholder="Nombre completo" />
-                        <FormInput label="Teléfono del Contacto" value={emergencyPhone} onChangeText={setEmergencyPhone} placeholder="Número de teléfono" keyboardType="phone-pad" />
-                    </View>
+                        <View style={styles.formSection}>
+                            <Text style={styles.sectionTitle}>Contacto de Emergencia</Text>
+                            <FormInput label="Nombre del Contacto" value={emergencyName} onChangeText={setEmergencyName} placeholder="Nombre completo" />
+                            <FormInput label="Teléfono del Contacto" value={emergencyPhone} onChangeText={setEmergencyPhone} placeholder="Número de teléfono" keyboardType="phone-pad" />
+                        </View>
 
-                    <View style={styles.actionButtons}>
-                        <SecondaryButton title="Cancelar" onPress={() => navigation.goBack()} icon="close-outline" color={COLORS.secondary} />
-                        <PrimaryButton title="Guardar" onPress={handleSave} disabled={saving || uploading} loading={saving} icon="save-outline" />
-                    </View>
-                </ScrollView>
+                        <View style={styles.actionButtons}>
+                            <SecondaryButton title="Cancelar" onPress={() => navigation.goBack()} icon="close-outline" color={COLORS.secondary} />
+                            <PrimaryButton title="Guardar" onPress={handleSave} disabled={saving || uploading} loading={saving} icon="save-outline" />
+                        </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </SafeAreaView>
         </View>
     );

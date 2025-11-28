@@ -8,6 +8,7 @@ import QuickActionCard from '../../components/admin/common/QuickActionCard';
 import LoadingState from '../../components/admin/common/LoadingState';
 import { useAdminData } from '../../hooks/admin/useAdminData';
 import { responsiveSize } from '../../utils/helpers';
+import FloatingChatButton from '../../components/shared/FloatingChatButton';
 
 // Configuración de acciones rápidas del admin
 const quickActions = [
@@ -137,6 +138,7 @@ export default function AdminHome({ navigation }) {
           </View>
         </View>
       </ScrollView>
+      <FloatingChatButton />
     </AdminLayout>
   );
 }

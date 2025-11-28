@@ -8,6 +8,8 @@ import {
     TextInput,
     Alert,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
@@ -156,7 +158,7 @@ export default function AdminNuevaCita({ navigation, route }) {
             // Crear appointment_time combinando fecha y hora
             const appointmentDateTime = `${selectedDate}T${selectedTime}:00`;
 
-            const { error } = await supabase
+            const { data: newAppointment, error } = await supabase
                 .from('appointments')
                 .insert({
                     pet_id: selectedPet,
@@ -164,11 +166,33 @@ export default function AdminNuevaCita({ navigation, route }) {
                     appointment_time: appointmentDateTime,
                     reason: reason.trim(),
                     status_id: statusData.id,
-                });
+                })
+                .select()
+                .single();
 
             if (error) throw error;
 
-            Alert.alert('Éxito', 'Cita creada correctamente', [
+            // --- CREAR NOTIFICACIONES ---
+
+            // 1. Notificar al Cliente
+            await supabase.from('notifications').insert({
+                user_id: selectedClient,
+                type: 'new_appointment',
+                title: 'Nueva Cita Programada',
+                content: `Se ha programado una cita para el ${moment(appointmentDateTime).format('DD/MM/YYYY HH:mm')}.`,
+                link_id: newAppointment.id
+            });
+
+            // 2. Notificar al Veterinario
+            await supabase.from('notifications').insert({
+                user_id: selectedVet,
+                type: 'new_appointment',
+                title: 'Nueva Cita Asignada',
+                content: `Se te ha asignado una nueva cita para el ${moment(appointmentDateTime).format('DD/MM/YYYY HH:mm')}.`,
+                link_id: newAppointment.id
+            });
+
+            Alert.alert('Éxito', 'Cita creada y notificaciones enviadas', [
                 {
                     text: 'OK',
                     onPress: () => navigation.goBack(),
@@ -193,156 +217,162 @@ export default function AdminNuevaCita({ navigation, route }) {
 
     return (
         <AdminLayout navigation={navigation}>
-            <ScrollView contentContainerStyle={styles.container}>
-                <Text style={styles.title}>Nueva Cita</Text>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+                <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+                    <Text style={styles.title}>Nueva Cita</Text>
 
-                {/* Cliente */}
-                <View style={styles.section}>
-                    <Text style={styles.label}>Cliente</Text>
-                    <View style={styles.pickerContainer}>
-                        {clients.map((client) => (
-                            <TouchableOpacity
-                                key={client.id}
-                                style={[
-                                    styles.optionButton,
-                                    selectedClient === client.id && styles.optionButtonSelected,
-                                ]}
-                                onPress={() => setSelectedClient(client.id)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        selectedClient === client.id && styles.optionTextSelected,
-                                    ]}
-                                >
-                                    {client.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Mascota */}
-                {selectedClient && (
+                    {/* Cliente */}
                     <View style={styles.section}>
-                        <Text style={styles.label}>Mascota</Text>
+                        <Text style={styles.label}>Cliente</Text>
                         <View style={styles.pickerContainer}>
-                            {pets.length === 0 ? (
-                                <Text style={styles.emptyText}>Este cliente no tiene mascotas</Text>
-                            ) : (
-                                pets.map((pet) => (
-                                    <TouchableOpacity
-                                        key={pet.id}
+                            {clients.map((client) => (
+                                <TouchableOpacity
+                                    key={client.id}
+                                    style={[
+                                        styles.optionButton,
+                                        selectedClient === client.id && styles.optionButtonSelected,
+                                    ]}
+                                    onPress={() => setSelectedClient(client.id)}
+                                >
+                                    <Text
                                         style={[
-                                            styles.optionButton,
-                                            selectedPet === pet.id && styles.optionButtonSelected,
+                                            styles.optionText,
+                                            selectedClient === client.id && styles.optionTextSelected,
                                         ]}
-                                        onPress={() => setSelectedPet(pet.id)}
                                     >
-                                        <Text
-                                            style={[
-                                                styles.optionText,
-                                                selectedPet === pet.id && styles.optionTextSelected,
-                                            ]}
-                                        >
-                                            {pet.name} ({pet.species?.name || 'N/A'})
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))
-                            )}
+                                        {client.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     </View>
-                )}
 
-                {/* Veterinario */}
-                <View style={styles.section}>
-                    <Text style={styles.label}>Veterinario</Text>
-                    <View style={styles.pickerContainer}>
-                        {vets.map((vet) => (
-                            <TouchableOpacity
-                                key={vet.id}
-                                style={[
-                                    styles.optionButton,
-                                    selectedVet === vet.id && styles.optionButtonSelected,
-                                ]}
-                                onPress={() => setSelectedVet(vet.id)}
-                            >
-                                <Text
+                    {/* Mascota */}
+                    {selectedClient && (
+                        <View style={styles.section}>
+                            <Text style={styles.label}>Mascota</Text>
+                            <View style={styles.pickerContainer}>
+                                {pets.length === 0 ? (
+                                    <Text style={styles.emptyText}>Este cliente no tiene mascotas</Text>
+                                ) : (
+                                    pets.map((pet) => (
+                                        <TouchableOpacity
+                                            key={pet.id}
+                                            style={[
+                                                styles.optionButton,
+                                                selectedPet === pet.id && styles.optionButtonSelected,
+                                            ]}
+                                            onPress={() => setSelectedPet(pet.id)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.optionText,
+                                                    selectedPet === pet.id && styles.optionTextSelected,
+                                                ]}
+                                            >
+                                                {pet.name} ({pet.species?.name || 'N/A'})
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))
+                                )}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Veterinario */}
+                    <View style={styles.section}>
+                        <Text style={styles.label}>Veterinario</Text>
+                        <View style={styles.pickerContainer}>
+                            {vets.map((vet) => (
+                                <TouchableOpacity
+                                    key={vet.id}
                                     style={[
-                                        styles.optionText,
-                                        selectedVet === vet.id && styles.optionTextSelected,
+                                        styles.optionButton,
+                                        selectedVet === vet.id && styles.optionButtonSelected,
                                     ]}
+                                    onPress={() => setSelectedVet(vet.id)}
                                 >
-                                    {vet.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                                    <Text
+                                        style={[
+                                            styles.optionText,
+                                            selectedVet === vet.id && styles.optionTextSelected,
+                                        ]}
+                                    >
+                                        {vet.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
-                </View>
 
-                {/* Calendario */}
-                <View style={styles.section}>
-                    <Text style={styles.label}>Fecha</Text>
-                    <Calendar
-                        onDayPress={(day) => setSelectedDate(day.dateString)}
-                        markedDates={markedDates}
-                        minDate={moment().format('YYYY-MM-DD')}
-                        theme={{
-                            selectedDayBackgroundColor: COLORS.accent,
-                            todayTextColor: COLORS.accent,
-                            arrowColor: COLORS.accent,
-                        }}
-                    />
-                    {selectedDate && (
-                        <Text style={styles.selectedText}>
-                            Fecha seleccionada: {moment(selectedDate).format('DD/MM/YYYY')}
-                        </Text>
-                    )}
-                </View>
+                    {/* Calendario */}
+                    <View style={styles.section}>
+                        <Text style={styles.label}>Fecha</Text>
+                        <Calendar
+                            onDayPress={(day) => setSelectedDate(day.dateString)}
+                            markedDates={markedDates}
+                            minDate={moment().format('YYYY-MM-DD')}
+                            theme={{
+                                selectedDayBackgroundColor: COLORS.accent,
+                                todayTextColor: COLORS.accent,
+                                arrowColor: COLORS.accent,
+                            }}
+                        />
+                        {selectedDate && (
+                            <Text style={styles.selectedText}>
+                                Fecha seleccionada: {moment(selectedDate).format('DD/MM/YYYY')}
+                            </Text>
+                        )}
+                    </View>
 
-                {/* Hora */}
-                <View style={styles.section}>
-                    <Text style={styles.label}>Hora (HH:MM)</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ej: 14:30"
-                        placeholderTextColor={COLORS.secondary}
-                        value={selectedTime}
-                        onChangeText={setSelectedTime}
-                        keyboardType="numbers-and-punctuation"
-                    />
-                </View>
+                    {/* Hora */}
+                    <View style={styles.section}>
+                        <Text style={styles.label}>Hora (HH:MM)</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Ej: 14:30"
+                            placeholderTextColor={COLORS.secondary}
+                            value={selectedTime}
+                            onChangeText={setSelectedTime}
+                            keyboardType="numbers-and-punctuation"
+                        />
+                    </View>
 
-                {/* Motivo */}
-                <View style={styles.section}>
-                    <Text style={styles.label}>Motivo de la cita</Text>
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        placeholder="Describe el motivo de la consulta..."
-                        placeholderTextColor={COLORS.secondary}
-                        value={reason}
-                        onChangeText={setReason}
-                        multiline
-                        numberOfLines={4}
-                    />
-                </View>
+                    {/* Motivo */}
+                    <View style={styles.section}>
+                        <Text style={styles.label}>Motivo de la cita</Text>
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            placeholder="Describe el motivo de la consulta..."
+                            placeholderTextColor={COLORS.secondary}
+                            value={reason}
+                            onChangeText={setReason}
+                            multiline
+                            numberOfLines={4}
+                        />
+                    </View>
 
-                {/* Botón */}
-                <TouchableOpacity
-                    style={[styles.button, loading && styles.buttonDisabled]}
-                    onPress={handleCreateAppointment}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color={COLORS.white} />
-                    ) : (
-                        <>
-                            <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
-                            <Text style={styles.buttonText}>Crear Cita</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
-            </ScrollView>
+                    {/* Botón */}
+                    <TouchableOpacity
+                        style={[styles.button, loading && styles.buttonDisabled]}
+                        onPress={handleCreateAppointment}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color={COLORS.white} />
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
+                                <Text style={styles.buttonText}>Crear Cita</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </AdminLayout>
     );
 }

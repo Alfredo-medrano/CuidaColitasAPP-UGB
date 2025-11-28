@@ -8,7 +8,8 @@ import {
     ActivityIndicator,
     RefreshControl,
     TextInput,
-    StatusBar
+    StatusBar,
+    Image
 } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +21,21 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 
 // Componente para el Avatar (Iniciales o Imagen)
-const Avatar = ({ name }) => {
+const Avatar = ({ name, avatarUrl }) => {
     const initial = name ? name.charAt(0).toUpperCase() : '?';
+
+    if (avatarUrl) {
+        return (
+            <View style={styles.avatarContainer}>
+                <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                />
+            </View>
+        );
+    }
+
     return (
         <View style={styles.avatarContainer}>
             <Text style={styles.avatarText}>{initial}</Text>
@@ -65,7 +79,7 @@ const ConversationItem = ({ item, currentUserId }) => {
             onPress={goToChat}
             activeOpacity={0.7}
         >
-            <Avatar name={otherUser.name} />
+            <Avatar name={otherUser.name} avatarUrl={otherUser.avatar_url} />
 
             <View style={styles.contentContainer}>
                 <View style={styles.topRow}>
@@ -317,11 +331,16 @@ const styles = StyleSheet.create({
         marginRight: 15,
         borderWidth: 1,
         borderColor: COLORS.accent,
+        overflow: 'hidden',
     },
     avatarText: {
         fontFamily: FONTS.PoppinsBold,
         fontSize: 22,
         color: COLORS.primary,
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
     },
 
     // CONTENIDO DEL CARD

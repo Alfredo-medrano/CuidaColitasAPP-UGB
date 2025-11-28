@@ -112,12 +112,8 @@ export default function ChatScreen({ route, navigation }) {
         setMessages((prev) => {
             const exists = prev.some(msg => msg.id === newMsg.id);
             if (exists) return prev;
-            return [...prev, newMsg];
+            return [newMsg, ...prev];
         });
-
-        setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
 
         if (newMsg.sender_id !== user.id) {
             await supabase.from('messages').update({ is_read: true }).eq('id', newMsg.id);
@@ -133,7 +129,7 @@ export default function ChatScreen({ route, navigation }) {
             .from('messages')
             .select('*')
             .eq('conversation_id', conversation_id)
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: false }); // Descending for inverted list
 
         if (!error) {
             setMessages(data);
@@ -184,15 +180,30 @@ export default function ChatScreen({ route, navigation }) {
 
     const renderMessageItem = ({ item, index }) => {
         const isMyMessage = item.sender_id === user.id;
-        const isNextMessageMine = messages[index + 1]?.sender_id === item.sender_id;
+
+        // Inverted List Logic:
+        // index + 1 = Older message (Visually Above)
+        // index - 1 = Newer message (Visually Below)
+
+        const isOlderMessageSame = messages[index + 1]?.sender_id === item.sender_id;
+        const isNewerMessageSame = messages[index - 1]?.sender_id === item.sender_id;
+
+        const bubbleStyle = {
+            ...styles.messageBubble,
+            ...(isMyMessage ? styles.myBubble : styles.otherBubble),
+        };
+
+        // Adjust corners for grouping
+        if (isMyMessage) {
+            if (isOlderMessageSame) bubbleStyle.borderTopRightRadius = 4;
+            if (isNewerMessageSame) bubbleStyle.borderBottomRightRadius = 4;
+        } else {
+            if (isOlderMessageSame) bubbleStyle.borderTopLeftRadius = 4;
+            if (isNewerMessageSame) bubbleStyle.borderBottomLeftRadius = 4;
+        }
 
         return (
-            <View style={[
-                styles.messageBubble,
-                isMyMessage ? styles.myBubble : styles.otherBubble,
-                isMyMessage && isNextMessageMine ? { borderBottomRightRadius: 4 } : {},
-                !isMyMessage && isNextMessageMine ? { borderBottomLeftRadius: 4 } : {}
-            ]}>
+            <View style={bubbleStyle}>
                 <Text style={[styles.msgText, isMyMessage ? styles.myMsgText : styles.otherMsgText]}>
                     {item.content}
                 </Text>
@@ -233,11 +244,10 @@ export default function ChatScreen({ route, navigation }) {
                         data={messages}
                         keyExtractor={(item) => item.id.toString()}
                         renderItem={renderMessageItem}
+                        inverted
                         contentContainerStyle={messages.length === 0 ? { flex: 1, justifyContent: 'center' } : styles.listContent}
-                        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                         ListEmptyComponent={() => (
-                            <View style={styles.emptyContainer}>
+                            <View style={[styles.emptyContainer, { transform: [{ scaleY: -1 }] }]}>
                                 <View style={styles.emptyIconBg}>
                                     <Ionicons name="chatbubbles-outline" size={32} color={COLORS.primary} />
                                 </View>

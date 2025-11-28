@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, Alert, ScrollView, ActivityIndicator, TextInput, TouchableOpacity, StatusBar, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Modal, Alert, ScrollView, ActivityIndicator, TextInput, TouchableOpacity, StatusBar, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import moment from 'moment'; 
+import moment from 'moment';
 import 'moment/locale/es';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
-import { useAppointmentForm } from '../../hooks/useAppointmentForm'; 
+import { useAppointmentForm } from '../../hooks/useAppointmentForm';
 
 // Componente para el selector modal
 const ModalPicker = ({ label, selectedValue, onSelect, items, icon, placeholder, enabled = true }) => {
     const [modalVisible, setModalVisible] = useState(false);
-    const safeItems = items || []; 
+    const safeItems = items || [];
     const selectedLabel = safeItems.find(item => item.value === selectedValue)?.label || placeholder;
 
     return (
         <View style={styles.inputGroup}>
             <Text style={styles.label}>{label}</Text>
-            <TouchableOpacity 
-                style={[styles.pickerButton, !enabled && styles.disabledInput]} 
+            <TouchableOpacity
+                style={[styles.pickerButton, !enabled && styles.disabledInput]}
                 onPress={() => enabled && setModalVisible(true)}
                 disabled={!enabled}
             >
@@ -59,8 +59,8 @@ const DateTimeDisplay = ({ label, value, onPress, icon, format, enabled = true }
 export default function SolicitarCita({ navigation }) {
     // Usar el Hook personalizado para manejar el formulario
     const { state, actions, selectors } = useAppointmentForm(navigation);
-    const { 
-        loading, saving, 
+    const {
+        loading, saving,
         selectedPetId, selectedType,
         isDateTimePickerVisible, dateTimePickerMode,
         date, time, reason
@@ -80,115 +80,121 @@ export default function SolicitarCita({ navigation }) {
                 <View style={styles.headerButton} />
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
-                
-                {/* FORMULARIO PRINCIPAL */}
-                <View style={styles.formCard}>
-                    {/* Selector de Mascota */}
-                    <ModalPicker 
-                        label="Mascota" 
-                        selectedValue={selectedPetId} 
-                        onSelect={actions.updatePetId} 
-                        items={selectors.petOptions} 
-                        icon="chevron-down" 
-                        placeholder={selectors.petOptions.length > 0 ? "Seleccionar mascota..." : "No tienes mascotas"} 
-                        enabled={selectors.petOptions.length > 0} 
-                    />
-                    
-                    {/* Selector de Tipo de Consulta */}
-                    <ModalPicker 
-                        label="Tipo de Consulta" 
-                        selectedValue={selectedType} 
-                        onSelect={actions.updateServiceId} 
-                        items={selectors.serviceOptions} 
-                        icon="chevron-down" 
-                        placeholder="Seleccionar tipo..."
-                        enabled={!!selectedPetId}
-                    />
-                    
-                    {/* Selectores de Fecha y Hora */}
-                    <View style={styles.row}>
-                        <DateTimeDisplay 
-                            label="Fecha Preferida" 
-                            value={selectors.displayDate} 
-                            onPress={() => actions.showPicker('date')} 
-                            icon="calendar-outline" 
-                            format="DD / MM / YYYY"
-                            enabled={!!selectedType}
-                        />
-                        <DateTimeDisplay 
-                            label="Hora Preferida" 
-                            value={selectors.displayTime} 
-                            onPress={() => actions.showPicker('time')} 
-                            icon="time-outline" 
-                            format="HH:mm A"
-                            enabled={!!selectedType}
-                        />
-                    </View>
-                    
-                    {/* Motivo de la Consulta */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Motivo de la Consulta</Text>
-                        <TextInput 
-                            style={[styles.input, !selectedType && styles.disabledInput]} 
-                            multiline 
-                            value={reason} 
-                            onChangeText={actions.updateReason} 
-                            placeholder="Describe brevemente los síntomas..." 
-                            placeholderTextColor={COLORS.secondary + '80'}
-                            editable={!!selectedType}
-                        />
-                    </View>
-                </View>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+                <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
 
-                {/* Mensaje Informativo */}
-                <View style={styles.infoBox}>
-                    <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
-                    <Text style={styles.infoBoxText}>Tu solicitud será revisada por el veterinario asignado para confirmar la disponibilidad y la hora exacta.</Text>
-                </View>
+                    {/* FORMULARIO PRINCIPAL */}
+                    <View style={styles.formCard}>
+                        {/* Selector de Mascota */}
+                        <ModalPicker
+                            label="Mascota"
+                            selectedValue={selectedPetId}
+                            onSelect={actions.updatePetId}
+                            items={selectors.petOptions}
+                            icon="chevron-down"
+                            placeholder={selectors.petOptions.length > 0 ? "Seleccionar mascota..." : "No tienes mascotas"}
+                            enabled={selectors.petOptions.length > 0}
+                        />
 
-                {/* Botones de Acción */}
-                <View style={styles.actionButtons}>
-                    <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
-                        <Text style={styles.cancelButtonText}>Cancelar</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                        style={[styles.submitButton, (!selectors.isFormValid || saving) && styles.submitButtonDisabled]} 
-                        onPress={actions.handleSubmit} 
-                        disabled={!selectors.isFormValid || saving}
-                    >
-                        {saving ? 
-                            <ActivityIndicator color={COLORS.white} /> 
-                            : ( 
-                                <>
-                                    <Ionicons name="send-outline" size={20} color={COLORS.white} />
-                                    <Text style={styles.submitButtonText}>Enviar Solicitud</Text>
-                                </> 
-                            )
-                        }
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+                        {/* Selector de Tipo de Consulta */}
+                        <ModalPicker
+                            label="Tipo de Consulta"
+                            selectedValue={selectedType}
+                            onSelect={actions.updateServiceId}
+                            items={selectors.serviceOptions}
+                            icon="chevron-down"
+                            placeholder="Seleccionar tipo..."
+                            enabled={!!selectedPetId}
+                        />
+
+                        {/* Selectores de Fecha y Hora */}
+                        <View style={styles.row}>
+                            <DateTimeDisplay
+                                label="Fecha Preferida"
+                                value={selectors.displayDate}
+                                onPress={() => actions.showPicker('date')}
+                                icon="calendar-outline"
+                                format="DD / MM / YYYY"
+                                enabled={!!selectedType}
+                            />
+                            <DateTimeDisplay
+                                label="Hora Preferida"
+                                value={selectors.displayTime}
+                                onPress={() => actions.showPicker('time')}
+                                icon="time-outline"
+                                format="HH:mm A"
+                                enabled={!!selectedType}
+                            />
+                        </View>
+
+                        {/* Motivo de la Consulta */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Motivo de la Consulta</Text>
+                            <TextInput
+                                style={[styles.input, !selectedType && styles.disabledInput]}
+                                multiline
+                                value={reason}
+                                onChangeText={actions.updateReason}
+                                placeholder="Describe brevemente los síntomas..."
+                                placeholderTextColor={COLORS.secondary + '80'}
+                                editable={!!selectedType}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Mensaje Informativo */}
+                    <View style={styles.infoBox}>
+                        <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} />
+                        <Text style={styles.infoBoxText}>Tu solicitud será revisada por el veterinario asignado para confirmar la disponibilidad y la hora exacta.</Text>
+                    </View>
+
+                    {/* Botones de Acción */}
+                    <View style={styles.actionButtons}>
+                        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+                            <Text style={styles.cancelButtonText}>Cancelar</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.submitButton, (!selectors.isFormValid || saving) && styles.submitButtonDisabled]}
+                            onPress={actions.handleSubmit}
+                            disabled={!selectors.isFormValid || saving}
+                        >
+                            {saving ?
+                                <ActivityIndicator color={COLORS.white} />
+                                : (
+                                    <>
+                                        <Ionicons name="send-outline" size={20} color={COLORS.white} />
+                                        <Text style={styles.submitButtonText}>Enviar Solicitud</Text>
+                                    </>
+                                )
+                            }
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* PICKER DE FECHA Y HORA */}
             {isDateTimePickerVisible && (
                 <Modal transparent={true} animationType="fade" visible={true}>
                     <View style={styles.modalOverlay}>
                         <View style={styles.datePickerContainer}>
-                            <DateTimePicker 
+                            <DateTimePicker
                                 value={dateTimePickerMode === 'date' ? date : time}
                                 mode={dateTimePickerMode}
                                 display="spinner"
                                 is24Hour={false}
-                                onChange={actions.handlePickerChange} 
+                                onChange={actions.handlePickerChange}
                             />
-                            
-                            <TouchableOpacity style={styles.closeButton} onPress={() => { 
+
+                            <TouchableOpacity style={styles.closeButton} onPress={() => {
                                 if (dateTimePickerMode === 'date') {
-                                    actions.transitionToTimePicker(); 
+                                    actions.transitionToTimePicker();
                                 } else {
-                                    actions.closePickerAndSetTime(); 
+                                    actions.closePickerAndSetTime();
                                 }
                             }}>
                                 <Text style={styles.closeButtonText}>

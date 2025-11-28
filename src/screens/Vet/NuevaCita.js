@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator, TextInput, Platform, KeyboardAvoidingView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../api/Supabase';
@@ -65,7 +65,7 @@ export default function NuevaCita({ navigation }) {
         .select('clinic_id')
         .eq('id', vetUser.id)
         .single();
-      
+
       if (profileError) throw profileError;
 
       // 2. VERIFICACIÓN CRÍTICA: Asegurarse de que el vet tiene una clínica
@@ -139,70 +139,76 @@ export default function NuevaCita({ navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}><Icon name="arrow-left" size={20} color="#013847" /></Pressable>
-        <Text style={styles.headerTitle}>Nueva Cita</Text>
-        <View style={{width: 20}} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Información de la Cita</Text>
-        
-        <Text style={styles.label}>Paciente</Text>
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={selectedPetId} onValueChange={(itemValue) => setSelectedPetId(itemValue)}>
-            <Picker.Item label="Seleccionar paciente..." value={null} />
-            {pets.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}
-          </Picker>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()}><Icon name="arrow-left" size={20} color="#013847" /></Pressable>
+          <Text style={styles.headerTitle}>Nueva Cita</Text>
+          <View style={{ width: 20 }} />
         </View>
 
-        <View style={styles.row}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Información de la Cita</Text>
+
+          <Text style={styles.label}>Paciente</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={selectedPetId} onValueChange={(itemValue) => setSelectedPetId(itemValue)}>
+              <Picker.Item label="Seleccionar paciente..." value={null} />
+              {pets.map(p => <Picker.Item key={p.id} label={p.name} value={p.id} />)}
+            </Picker>
+          </View>
+
+          <View style={styles.row}>
             <View style={styles.col}>
-                <Text style={styles.label}>Fecha</Text>
-                <Pressable onPress={() => setShowPicker({ ...showPicker, date: true })}>
-                    <TextInput 
-                      style={styles.input} 
-                      editable={false} 
-                      value={date.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'})} 
-                    />
-                </Pressable>
+              <Text style={styles.label}>Fecha</Text>
+              <Pressable onPress={() => setShowPicker({ ...showPicker, date: true })}>
+                <TextInput
+                  style={styles.input}
+                  editable={false}
+                  value={date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                />
+              </Pressable>
             </View>
             <View style={styles.col}>
-                <Text style={styles.label}>Hora</Text>
-                 <Pressable onPress={() => setShowPicker({ ...showPicker, time: true })}>
-                    <TextInput 
-                      style={styles.input} 
-                      editable={false} 
-                      value={time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 
-                    />
-                </Pressable>
+              <Text style={styles.label}>Hora</Text>
+              <Pressable onPress={() => setShowPicker({ ...showPicker, time: true })}>
+                <TextInput
+                  style={styles.input}
+                  editable={false}
+                  value={time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                />
+              </Pressable>
             </View>
+          </View>
+
+          <Text style={styles.label}>Tipo de Consulta / Motivo</Text>
+          <TextInput
+            style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+            multiline
+            value={reason}
+            onChangeText={setReason}
+            placeholder="Motivo de la consulta o notas adicionales..."
+          />
+
+          {showPicker.date && <DateTimePicker value={date} mode="date" display="default" onChange={onChangeDate} />}
+          {showPicker.time && <DateTimePicker value={time} mode="time" display="default" onChange={onChangeTime} />}
         </View>
-        
-        <Text style={styles.label}>Tipo de Consulta / Motivo</Text>
-        <TextInput 
-          style={[styles.input, {height: 100, textAlignVertical: 'top'}]} 
-          multiline 
-          value={reason} 
-          onChangeText={setReason} 
-          placeholder="Motivo de la consulta o notas adicionales..." 
-        />
 
-        {showPicker.date && <DateTimePicker value={date} mode="date" display="default" onChange={onChangeDate} />}
-        {showPicker.time && <DateTimePicker value={time} mode="time" display="default" onChange={onChangeTime} />}
-      </View>
-
-      <View style={styles.actionButtons}>
-        <Pressable style={[styles.button, styles.cancelButton]} onPress={() => navigation.goBack()}>
-          <Text style={[styles.buttonText, {color: '#333'}]}>Cancelar</Text>
-        </Pressable>
-        <Pressable style={[styles.button, styles.saveButton]} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Icon name="calendar-check" size={16} color="#fff" style={{marginRight: 10}}/>}
-          <Text style={styles.buttonText}>Programar Cita</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        <View style={styles.actionButtons}>
+          <Pressable style={[styles.button, styles.cancelButton]} onPress={() => navigation.goBack()}>
+            <Text style={[styles.buttonText, { color: '#333' }]}>Cancelar</Text>
+          </Pressable>
+          <Pressable style={[styles.button, styles.saveButton]} onPress={handleSubmit} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Icon name="calendar-check" size={16} color="#fff" style={{ marginRight: 10 }} />}
+            <Text style={styles.buttonText}>Programar Cita</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -55,6 +55,7 @@ import AdminLogs from './src/screens/admin/AdminLogs';
 import ConfiguracionSistema from './src/screens/admin/ConfiguracionSistema';
 import ConversationListScreen from './src/screens/Chat/ConversationListScreen';
 import ChatScreen from './src/screens/Chat/ChatScreen';
+import BotpressScreen from './src/screens/ChatBot/BotpressScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -74,31 +75,34 @@ function AuthStack() {
 function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
+      {/* Home es la primera pantalla para redirigir según rol */}
       <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
+
+      {/* Pantallas de Cliente */}
       <Stack.Screen name="ClienteHome" component={ClienteHome} options={{ headerShown: false }} />
       <Stack.Screen name="ProfileCliente" component={ProfileCliente} options={{ headerShown: false }} />
       <Stack.Screen name="EditProfileClient" component={EditProfileClient} options={{ headerShown: false }} />
       <Stack.Screen name="MisMascotas" component={MisMascotas} options={{ headerShown: false }} />
       <Stack.Screen name="HistorialMedicoC" component={HistorialMedicoC} options={{ headerShown: false }} />
-      <Stack.Screen name="MisCitas" component={MisCitas} options={{ title: 'Mis Citas' }} />
-      <Stack.Screen name="SolicitarCita" component={SolicitarCita} options={{ title: 'Solicitar Cita' }} />
-      <Stack.Screen name="ReprogramarCita" component={ReprogramarCita} options={{ title: 'Reprogramar Cita' }} />
+      <Stack.Screen name="MisCitas" component={MisCitas} options={{ headerShown: false }} />
+      <Stack.Screen name="SolicitarCita" component={SolicitarCita} options={{ headerShown: false }} />
+      <Stack.Screen name="ReprogramarCita" component={ReprogramarCita} options={{ headerShown: false }} />
+
+      {/* Pantallas de Veterinario */}
       <Stack.Screen name="VeterinarioHome" component={VeterinarioHome} options={{ headerShown: false }} />
-      <Stack.Screen name="Profile" component={Profile} options={{ title: 'Mi Perfil', headerStyle: { backgroundColor: '#013847' }, headerTintColor: '#fff', }} />
-      <Stack.Screen name="EditProfile" component={EditProfile} options={{ title: 'Editar Perfil', }} />
-      <Stack.Screen name="MisPacientes" component={MisPacientes} options={{ title: 'Mis Pacientes' }} />
-      <Stack.Screen name="AgendaDelDia" component={AgendaDelDia} options={{ title: 'Agenda del Día' }} />
-      <Stack.Screen name="Mensajes" component={ConversationListScreen} options={{ title: 'Mensajes' }} />
-      <Stack.Screen name="ChatScreen" component={ChatScreen} options={({ route }) => ({ title: route.params.other_user_name })} />
-      <Stack.Screen name="NuevaCita" component={NuevaCita} options={{ title: 'Nueva Cita' }} />
+      <Stack.Screen name="Profile" component={Profile} options={{ headerShown: false }} />
+      <Stack.Screen name="EditProfile" component={EditProfile} options={{ headerShown: false }} />
+      <Stack.Screen name="MisPacientes" component={MisPacientes} options={{ headerShown: false }} />
+      <Stack.Screen name="AgendaDelDia" component={AgendaDelDia} options={{ headerShown: false }} />
+      <Stack.Screen name="NuevaCita" component={NuevaCita} options={{ headerShown: false }} />
       <Stack.Screen name="NuevoPaciente" component={NuevoPaciente} options={{ title: 'Nuevo Paciente' }} />
-      <Stack.Screen name="DetallePaciente" component={DetallePaciente} options={{ title: 'Detalle del Paciente' }} />
-      <Stack.Screen name="Notificaciones" component={Notificaciones} options={{ title: 'Notificaciones' }} />
-      <Stack.Screen name="HistorialMedico" component={HistorialMedico} options={{ title: 'Historial Médico' }} />
-      <Stack.Screen name="NuevaVisita" component={NuevaVisita} options={{ title: 'Nueva Visita' }} />
-      <Stack.Screen name="NuevaVacuna" component={NuevaVacuna} options={{ title: 'Nueva Vacuna' }} />
-      <Stack.Screen name="NuevoMedicamento" component={NuevoMedicamento} options={{ title: 'Nuevo Medicamento' }} />
-      <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
+      <Stack.Screen name="DetallePaciente" component={DetallePaciente} options={{ headerShown: false }} />
+      <Stack.Screen name="HistorialMedico" component={HistorialMedico} options={{ headerShown: false }} />
+      <Stack.Screen name="NuevaVisita" component={NuevaVisita} options={{ headerShown: false }} />
+      <Stack.Screen name="NuevaVacuna" component={NuevaVacuna} options={{ headerShown: false }} />
+      <Stack.Screen name="NuevoMedicamento" component={NuevoMedicamento} options={{ headerShown: false }} />
+
+      {/* Pantallas de Admin */}
       <Stack.Screen name="AdminHome" component={AdminHome} options={{ headerShown: false }} />
       <Stack.Screen name="AdminProfile" component={AdminProfile} options={{ title: 'Mi Perfil' }} />
       <Stack.Screen name="Vets" component={GestionVets} options={{ headerShown: false }} />
@@ -113,6 +117,13 @@ function AppStack() {
       <Stack.Screen name="AdminNuevaCita" component={AdminNuevaCita} options={{ headerShown: false }} />
       <Stack.Screen name="AdminLogs" component={AdminLogs} options={{ headerShown: false }} />
       <Stack.Screen name="ConfiguracionSistema" component={ConfiguracionSistema} options={{ headerShown: false }} />
+
+      {/* Pantallas Comunes / Chat */}
+      <Stack.Screen name="Mensajes" component={ConversationListScreen} options={{ title: 'Mensajes' }} />
+      <Stack.Screen name="ChatScreen" component={ChatScreen} options={({ route }) => ({ title: route.params?.other_user_name || 'Chat' })} />
+      <Stack.Screen name="Notificaciones" component={Notificaciones} options={{ title: 'Notificaciones' }} />
+      <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
+      <Stack.Screen name="ChatBot" component={BotpressScreen} options={{ title: 'Asistente Virtual', headerStyle: { backgroundColor: COLORS.primary }, headerTintColor: '#fff' }} />
     </Stack.Navigator>
   );
 }
