@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 const VisitCard = ({ visit }) => {
     const visitDate = new Date(visit.appointment_time);
+    // medical_records es un OBJETO (no array) porque hay UNIQUE constraint en appointment_id
+    const record = visit.medical_records;
 
     return (
         <View style={styles.card}>
@@ -17,9 +19,9 @@ const VisitCard = ({ visit }) => {
                 </View>
             </View>
             <View style={styles.cardBody}>
-                <InfoRow icon="clipboard-outline" label="Diagnóstico" value={visit.medical_records[0]?.diagnosis} />
-                <InfoRow icon="pulse-outline" label="Tratamiento" value={visit.medical_records[0]?.treatment} />
-                <InfoRow icon="document-text-outline" label="Notas" value={visit.medical_records[0]?.notes} />
+                <InfoRow icon="clipboard-outline" label="Diagnóstico" value={record?.diagnosis} />
+                <InfoRow icon="pulse-outline" label="Tratamiento" value={record?.treatment} />
+                <InfoRow icon="document-text-outline" label="Notas" value={record?.notes} />
             </View>
         </View>
     );
@@ -43,17 +45,21 @@ export default function ClientTabVisitas({ petId }) {
             const { data, error } = await supabase
                 .from('appointments')
                 .select(`
+                    id,
                     appointment_time,
                     vet:profiles!vet_id ( name ),
                     medical_records ( diagnosis, treatment, notes )
                 `)
                 .eq('pet_id', petId)
-                .not('medical_records', 'is', null) // Solo citas con historial
                 .order('appointment_time', { ascending: false });
 
             if (error) throw error;
-            setVisits(data || []);
+
+            // Filtrar solo las que tienen medical_records (es un objeto, no array)
+            const visitsWithRecords = data?.filter(v => v.medical_records && typeof v.medical_records === 'object') || [];
+            setVisits(visitsWithRecords);
         } catch (error) {
+            console.error('Error fetching visits:', error);
             Alert.alert("Error", "No se pudo cargar el historial de visitas.");
         } finally {
             setLoading(false);
@@ -73,7 +79,7 @@ export default function ClientTabVisitas({ petId }) {
     return (
         <FlatList
             data={visits}
-            keyExtractor={(item, index) => `${item.appointment_time}-${index}`}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
             renderItem={({ item }) => <VisitCard visit={item} />}
             contentContainerStyle={styles.listContainer}
             ListEmptyComponent={<Text style={styles.emptyText}>No hay visitas registradas.</Text>}

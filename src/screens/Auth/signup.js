@@ -37,6 +37,17 @@ export default function SignUp({ navigation, route }) {
 
     setLoading(true);
     try {
+      // Verificar si el registro está permitido
+      const { data: setting, error: settingError } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'allow_registrations')
+        .single();
+
+      if (!settingError && setting && setting.value === false) {
+        throw new Error('El registro de nuevos usuarios está deshabilitado temporalmente.');
+      }
+
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: emailNorm,
         password,

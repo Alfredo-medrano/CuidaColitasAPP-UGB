@@ -98,12 +98,49 @@ export const AuthProvider = ({ children }) => {
     await refreshAvatarUrl(p?.avatar_url || null, p?.updated_at);
   }, [user?.id, loadProfile, refreshAvatarUrl]);
 
+  // ------- Maintenance Mode Check -------
+  const [isMaintenance, setIsMaintenance] = useState(false);
+
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'maintenance_mode')
+        .single();
+
+      if (!error && data?.value) {
+        setIsMaintenance(true);
+      } else {
+        setIsMaintenance(false);
+      }
+    };
+
+    checkMaintenance();
+
+    // Realtime listener for settings
+    const channel = supabase
+      .channel('settings_realtime')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'system_settings',
+        filter: "key=eq.maintenance_mode",
+      }, (payload) => {
+        setIsMaintenance(payload.new.value);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const value = {
     session,
     user,
     profile,
     avatarUrl,     // ✅ úsalo en Home y Perfil
     loading,
+    isMaintenance, // ✅ Expose maintenance state
     refetchProfile, // ✅ llama esto tras guardar en EditProfile
     signOut: () => supabase.auth.signOut(),
   };

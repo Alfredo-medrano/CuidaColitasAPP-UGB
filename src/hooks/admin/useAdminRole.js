@@ -21,7 +21,7 @@ export const useAdminRole = () => {
             const { data, error: roleError } = await supabase
                 .from('roles')
                 .select('id')
-                .eq('name', roleName)
+                .ilike('name', roleName)
                 .single();
 
             if (roleError) throw roleError;

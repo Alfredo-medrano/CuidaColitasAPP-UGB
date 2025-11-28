@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../api/Supabase';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useAdminRole } from '../../hooks/admin/useAdminRole';
 
 const StatCard = ({ title, value, icon, color }) => (
     <View style={styles.statCard}>
@@ -45,6 +46,8 @@ export default function AdminStats() {
         totalPets: 0
     });
 
+    const { getVetRoleId, getClientRoleId } = useAdminRole();
+
     const fetchStats = async () => {
         try {
             // 1. Citas
@@ -59,17 +62,19 @@ export default function AdminStats() {
             const pending = appointments.filter(a => a.status?.status === 'Pendiente').length;
             const cancelled = appointments.filter(a => a.status?.status === 'Cancelada').length;
 
-            // 2. Usuarios (Roles)
-            // Nota: Esto es una aproximación si no tenemos acceso directo a auth.users, usamos profiles
+            // 2. Usuarios (Roles) - Obtener IDs dinámicamente
+            const vetRoleId = await getVetRoleId();
+            const clientRoleId = await getClientRoleId();
+
             const { count: vetsCount } = await supabase
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
-                .eq('role_id', 2); // Asumiendo 2 es veterinario
+                .eq('role_id', vetRoleId);
 
             const { count: clientsCount } = await supabase
                 .from('profiles')
                 .select('*', { count: 'exact', head: true })
-                .eq('role_id', 3); // Asumiendo 3 es cliente
+                .eq('role_id', clientRoleId);
 
             // 3. Mascotas
             const { count: petsCount } = await supabase

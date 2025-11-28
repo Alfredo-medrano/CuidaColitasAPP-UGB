@@ -100,6 +100,19 @@ export default function SolicitarCita({ navigation }) {
                             enabled={selectors.petOptions.length > 0}
                         />
 
+                        {/* Selector de Veterinario (Solo si no tiene asignado) */}
+                        {selectors.needsVetSelection && (
+                            <ModalPicker
+                                label="Asignar Veterinario"
+                                selectedValue={state.selectedVetId}
+                                onSelect={actions.updateVetId}
+                                items={selectors.vetOptions}
+                                icon="person-add-outline"
+                                placeholder="Seleccionar veterinario..."
+                                enabled={true}
+                            />
+                        )}
+
                         {/* Selector de Tipo de Consulta */}
                         <ModalPicker
                             label="Tipo de Consulta"

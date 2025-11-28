@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Alert, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../api/Supabase';
+import { useAuth } from '../../context/AuthContext';
 
 export default function NuevoPaciente({ navigation }) {
+  const { profile, user } = useAuth();
   const [petName, setPetName] = useState('');
   const [speciesId, setSpeciesId] = useState(null);
   const [breed, setBreed] = useState('');
@@ -13,6 +15,8 @@ export default function NuevoPaciente({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [speciesList, setSpeciesList] = useState([]);
 
+  const isClient = profile?.roles?.name === 'cliente';
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -20,17 +24,23 @@ export default function NuevoPaciente({ navigation }) {
         if (speciesError) throw speciesError;
         setSpeciesList(speciesData);
 
-        const { data: roleData, error: roleError } = await supabase.from('roles').select('id').eq('name', 'cliente').single();
-        if (roleError) throw roleError;
+        if (isClient) {
+          // Si es cliente, el dueño es él mismo
+          setSelectedClientId(user.id);
+        } else {
+          // Si es vet/admin, cargar lista de clientes
+          const { data: roleData, error: roleError } = await supabase.from('roles').select('id').eq('name', 'cliente').single();
+          if (roleError) throw roleError;
 
-        const { data: clientData, error: clientError } = await supabase
-          .from('profiles')
-          .select('id, name')
-          .eq('role_id', roleData.id)
-          .order('name', { ascending: true });
+          const { data: clientData, error: clientError } = await supabase
+            .from('profiles')
+            .select('id, name')
+            .eq('role_id', roleData.id)
+            .order('name', { ascending: true });
 
-        if (clientError) throw clientError;
-        setClients(clientData);
+          if (clientError) throw clientError;
+          setClients(clientData);
+        }
 
       } catch (error) {
         Alert.alert("Error", "No se pudieron cargar los datos iniciales.");
@@ -39,19 +49,24 @@ export default function NuevoPaciente({ navigation }) {
         setLoading(false);
       }
     };
-    loadInitialData();
-  }, []);
+
+    if (user) {
+      loadInitialData();
+    }
+  }, [user, isClient]);
 
   const handleCreatePaciente = async () => {
     if (!selectedClientId || !petName || !speciesId) {
-      Alert.alert("Error", "Por favor selecciona un dueño y completa el nombre y la especie de la mascota.");
+      Alert.alert("Error", "Por favor completa el nombre y la especie de la mascota.");
       return;
     }
     setLoading(true);
 
     try {
-      const { data: { user: vetUser } } = await supabase.auth.getUser();
-      if (!vetUser) throw new Error("No se pudo identificar al veterinario.");
+      // Si es cliente, no asignamos veterinario principal todavía (o null)
+      // Si es vet, se asigna a sí mismo
+      const primaryVetId = isClient ? null : user.id;
+
       const { error } = await supabase
         .from('pets')
         .insert({
@@ -60,12 +75,12 @@ export default function NuevoPaciente({ navigation }) {
           breed,
           sex,
           owner_id: selectedClientId,
-          primary_vet_id: vetUser.id,
+          primary_vet_id: primaryVetId,
         });
 
       if (error) throw error;
 
-      Alert.alert("Éxito", "Paciente creado y asignado exitosamente.", [
+      Alert.alert("Éxito", "Mascota registrada exitosamente.", [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
 
@@ -88,21 +103,25 @@ export default function NuevoPaciente({ navigation }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Nuevo Paciente</Text>
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Dueño del Paciente</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedClientId}
-              onValueChange={(itemValue) => setSelectedClientId(itemValue)}
-            >
-              <Picker.Item label="-- Elige un cliente --" value={null} />
-              {clients.map((client) => (
-                <Picker.Item key={client.id} label={client.name} value={client.id} />
-              ))}
-            </Picker>
+        <Text style={styles.title}>{isClient ? 'Registrar Mi Mascota' : 'Nuevo Paciente'}</Text>
+
+        {/* Solo mostrar selector de dueño si NO es cliente */}
+        {!isClient && (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Dueño del Paciente</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedClientId}
+                onValueChange={(itemValue) => setSelectedClientId(itemValue)}
+              >
+                <Picker.Item label="-- Elige un cliente --" value={null} />
+                {clients.map((client) => (
+                  <Picker.Item key={client.id} label={client.name} value={client.id} />
+                ))}
+              </Picker>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Información de la Mascota</Text>
@@ -133,7 +152,7 @@ export default function NuevoPaciente({ navigation }) {
             <Text style={[styles.buttonText, { color: '#333' }]}>Cancelar</Text>
           </Pressable>
           <Pressable style={styles.createButton} onPress={handleCreatePaciente} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear Paciente</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isClient ? 'Registrar' : 'Crear Paciente'}</Text>}
           </Pressable>
         </View>
       </ScrollView>

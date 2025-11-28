@@ -11,22 +11,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../../theme/theme';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { useSystemSettings } from '../../hooks/admin/useSystemSettings';
 import { responsiveSize } from '../../utils/helpers';
+import { ActivityIndicator, RefreshControl } from 'react-native';
 
 export default function ConfiguracionSistema({ navigation }) {
-    // Estados de configuración (en producción estos vendrían de BD)
-    const [config, setConfig] = useState({
-        allowNewRegistrations: true,
-        requireEmailVerification: false,
-        enableNotifications: true,
-        enableRealtime: true,
-        maintenanceMode: false,
-        autoBackup: true,
-    });
+    const { settings, loading, updateSetting, fetchSettings } = useSystemSettings();
 
-    const handleToggle = (key) => {
-        setConfig(prev => ({ ...prev, [key]: !prev[key] }));
-        Alert.alert('Configuración', `${key} actualizado`);
+    const handleToggle = (key, label) => {
+        const currentValue = settings[key];
+        updateSetting(key, !currentValue, label);
     };
 
     const ConfigSection = ({ title, children }) => (
@@ -65,9 +59,19 @@ export default function ConfiguracionSistema({ navigation }) {
         </View>
     );
 
+    if (loading && !settings.allow_registrations) { // Check if settings are loaded (using any key)
+        // Initial loading
+    }
+
     return (
         <AdminLayout navigation={navigation}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl refreshing={loading} onRefresh={fetchSettings} tintColor={COLORS.accent} />
+                }
+            >
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Configuración del Sistema</Text>
                     <Text style={styles.headerSubtitle}>Ajustes generales de la aplicación</Text>
@@ -78,8 +82,8 @@ export default function ConfiguracionSistema({ navigation }) {
                     <InfoCard
                         icon="server"
                         title="Estado del Sistema"
-                        value={config.maintenanceMode ? 'Mantenimiento' : 'Operativo'}
-                        color={config.maintenanceMode ? '#EF4444' : '#10B981'}
+                        value={settings.maintenance_mode ? 'Mantenimiento' : 'Operativo'}
+                        color={settings.maintenance_mode ? '#EF4444' : '#10B981'}
                     />
                     <InfoCard
                         icon="shield-checkmark"
@@ -100,15 +104,15 @@ export default function ConfiguracionSistema({ navigation }) {
                     <ConfigItem
                         icon="person-add"
                         label="Permitir nuevos registros"
-                        value={config.allowNewRegistrations}
-                        onToggle={() => handleToggle('allowNewRegistrations')}
+                        value={settings.allow_registrations}
+                        onToggle={() => handleToggle('allow_registrations', 'Permitir nuevos registros')}
                         color={COLORS.accent}
                     />
                     <ConfigItem
                         icon="mail"
-                        label="Requeririr verificación de email"
-                        value={config.requireEmailVerification}
-                        onToggle={() => handleToggle('requireEmailVerification')}
+                        label="Requerir verificación de email"
+                        value={settings.require_email_verification}
+                        onToggle={() => handleToggle('require_email_verification', 'Verificación de email')}
                         color="#F59E0B"
                     />
                 </ConfigSection>
@@ -118,29 +122,29 @@ export default function ConfiguracionSistema({ navigation }) {
                     <ConfigItem
                         icon="notifications"
                         label="Notificaciones push"
-                        value={config.enableNotifications}
-                        onToggle={() => handleToggle('enableNotifications')}
+                        value={settings.enable_notifications}
+                        onToggle={() => handleToggle('enable_notifications', 'Notificaciones push')}
                         color={COLORS.card}
                     />
                     <ConfigItem
                         icon="flash"
                         label="Actualización en tiempo real"
-                        value={config.enableRealtime}
-                        onToggle={() => handleToggle('enableRealtime')}
+                        value={settings.enable_realtime}
+                        onToggle={() => handleToggle('enable_realtime', 'Actualización en tiempo real')}
                         color="#6366F1"
                     />
                     <ConfigItem
                         icon="save"
                         label="Respaldo automático"
-                        value={config.autoBackup}
-                        onToggle={() => handleToggle('autoBackup')}
+                        value={settings.auto_backup}
+                        onToggle={() => handleToggle('auto_backup', 'Respaldo automático')}
                         color="#10B981"
                     />
                     <ConfigItem
                         icon="construct"
                         label="Modo mantenimiento"
-                        value={config.maintenanceMode}
-                        onToggle={() => handleToggle('maintenanceMode')}
+                        value={settings.maintenance_mode}
+                        onToggle={() => handleToggle('maintenance_mode', 'Modo mantenimiento')}
                         color="#EF4444"
                     />
                 </ConfigSection>

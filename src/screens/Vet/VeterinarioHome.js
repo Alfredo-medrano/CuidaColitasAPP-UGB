@@ -7,7 +7,7 @@ import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import { useVeterinarioHome } from '../../hooks/useVeterinarioHome';
 import { HomeHeader, NotificationCard, QuickActionsGrid } from '../../components/vet/VetHomeComponents';
 import { useAuth } from '../../context/AuthContext';
-import FloatingChatButton from '../../components/shared/FloatingChatButton';
+
 
 export default function VeterinarioHome({ navigation }) {
   const { profile, notifications, loading, refetch, unreadCount } = useVeterinarioHome();
@@ -87,7 +87,6 @@ export default function VeterinarioHome({ navigation }) {
         <Text style={styles.actionsTitle}>Acciones Rápidas</Text>
         <QuickActionsGrid navigation={navigation} />
       </ScrollView>
-      <FloatingChatButton />
     </SafeAreaView>
   );
 }

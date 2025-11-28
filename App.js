@@ -56,6 +56,7 @@ import ConfiguracionSistema from './src/screens/admin/ConfiguracionSistema';
 import ConversationListScreen from './src/screens/Chat/ConversationListScreen';
 import ChatScreen from './src/screens/Chat/ChatScreen';
 import BotpressScreen from './src/screens/ChatBot/BotpressScreen';
+import MaintenanceScreen from './src/screens/MaintenanceScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -119,18 +120,18 @@ function AppStack() {
       <Stack.Screen name="ConfiguracionSistema" component={ConfiguracionSistema} options={{ headerShown: false }} />
 
       {/* Pantallas Comunes / Chat */}
+      <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
       <Stack.Screen name="Mensajes" component={ConversationListScreen} options={{ title: 'Mensajes' }} />
       <Stack.Screen name="ChatScreen" component={ChatScreen} options={({ route }) => ({ title: route.params?.other_user_name || 'Chat' })} />
-      <Stack.Screen name="Notificaciones" component={Notificaciones} options={{ title: 'Notificaciones' }} />
-      <Stack.Screen name="DetalleCita" component={DetalleCita} options={{ title: 'Detalle de Cita' }} />
       <Stack.Screen name="ChatBot" component={BotpressScreen} options={{ title: 'Asistente Virtual', headerStyle: { backgroundColor: COLORS.primary }, headerTintColor: '#fff' }} />
+      <Stack.Screen name="Notificaciones" component={Notificaciones} options={{ title: 'Notificaciones' }} />
     </Stack.Navigator>
   );
 }
 
 //aqui se decide que stack mostrar
 function RootNavigator() {
-  const { session, loading } = useAuth();
+  const { session, loading, isMaintenance, profile } = useAuth();
   const [fontsLoaded] = useFonts({
     'Poppins-Regular': require('./src/assets/fonts/Poppins-Regular.ttf'),
     'Poppins-SemiBold': require('./src/assets/fonts/Poppins-SemiBold.ttf'),
@@ -143,6 +144,15 @@ function RootNavigator() {
         <ActivityIndicator size="large" color={COLORS.accent} />
       </View>
     );
+  }
+
+  // Check for maintenance mode
+  if (isMaintenance) {
+    // Allow admins to bypass maintenance
+    const isAdmin = profile?.roles?.name === 'admin';
+    if (!isAdmin) {
+      return <MaintenanceScreen />;
+    }
   }
 
   return (
