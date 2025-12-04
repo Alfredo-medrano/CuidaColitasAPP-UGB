@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import { supabase } from '../api/Supabase';
 import moment from 'moment';
 import 'moment/locale/es';
+import { scheduleAppointmentReminders } from '../services/notificationService';
 
 moment.locale('es');
 
@@ -22,9 +23,9 @@ export function useAppointmentForm(navigation) {
     // ESTADO DEL FORMULARIO
     // ----------------------
     const [pets, setPets] = useState([]);
-    const [vets, setVets] = useState([]); // Lista de veterinarios
+    const [vets, setVets] = useState([]);
     const [selectedPetId, setSelectedPetId] = useState(null);
-    const [selectedVetId, setSelectedVetId] = useState(null); // Veterinario seleccionado manualmente
+    const [selectedVetId, setSelectedVetId] = useState(null);
     const [selectedType, setSelectedType] = useState(null);
     const [date, setDate] = useState(new Date());
     const [time, setTime] = useState(new Date());
@@ -37,7 +38,6 @@ export function useAppointmentForm(navigation) {
     const [isDateTimePickerVisible, setDateTimePickerVisible] = useState(false);
     const [dateTimePickerMode, setDateTimePickerMode] = useState('date');
 
-
     // ----------------------
     // SELECTORES (useMemo)
     // ----------------------
@@ -47,13 +47,12 @@ export function useAppointmentForm(navigation) {
         return (pets || []).map(p => ({ label: p.name, value: p.id }));
     }, [pets]);
 
-    // Opciones de veterinarios (solo si la mascota no tiene uno asignado)
     const vetOptions = useMemo(() => {
-        if (selectedPet?.primary_vet_id) return []; // Si ya tiene, no mostramos lista
+        if (selectedPet?.primary_vet_id) return [];
         return (vets || []).map(v => ({
             label: `Dr. ${v.name} (${v.is_active === false ? 'Inactivo' : 'Activo'})`,
             value: v.id,
-            isActive: v.is_active !== false // Helper para UI si se necesita
+            isActive: v.is_active !== false
         }));
     }, [vets, selectedPet]);
 
@@ -62,14 +61,12 @@ export function useAppointmentForm(navigation) {
     }, []);
 
     const isFormValid = useMemo(() => {
-        // Si la mascota tiene vet, solo validamos lo básico. Si no, requerimos selectedVetId
         const hasVet = selectedPet?.primary_vet_id || selectedVetId;
         return selectedPetId && selectedType && reason.trim() && isTimeSet && hasVet;
     }, [selectedPetId, selectedType, reason, isTimeSet, selectedPet, selectedVetId]);
 
-
     // ----------------------
-    // LÓGICA DE FETCH (SIMPLIFICADA)
+    // LÓGICA DE FETCH
     // ----------------------
     const fetchInitialData = useCallback(async () => {
         setLoading(true);
@@ -77,13 +74,10 @@ export function useAppointmentForm(navigation) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Usuario no autenticado");
 
-            // 1. Cargar mascotas del cliente
             const { data: petData, error: petError } = await supabase.from('pets').select('id, name, primary_vet_id').eq('owner_id', user.id);
             if (petError) throw petError;
             setPets(petData || []);
 
-            // 2. Cargar lista de veterinarios (para selección si es necesario)
-            // Obtenemos el rol de veterinario primero
             const { data: roleData } = await supabase.from('roles').select('id').eq('name', 'veterinario').single();
             if (roleData) {
                 const { data: vetData } = await supabase
@@ -93,7 +87,6 @@ export function useAppointmentForm(navigation) {
                     .order('name');
                 setVets(vetData || []);
             }
-
         } catch (error) {
             console.error("Error cargando datos iniciales:", error.message);
             Alert.alert("Error", "No se pudieron cargar los datos necesarios para el formulario.");
@@ -107,7 +100,7 @@ export function useAppointmentForm(navigation) {
     }, [fetchInitialData]);
 
     // ----------------------
-    // LÓGICA DE DISPONIBILIDAD Y SUBIDA
+    // LÓGICA DE DISPONIBILIDAD
     // ----------------------
     const checkAppointmentConflict = useCallback(async (vetId, appointmentTime) => {
         const endTime = moment(appointmentTime).add(APPOINTMENT_DURATION_MINUTES, 'minutes').toISOString();
@@ -123,16 +116,16 @@ export function useAppointmentForm(navigation) {
         return existingAppointments && existingAppointments.length > 0;
     }, []);
 
-
+    // ----------------------
+    // SUBMIT CON RECORDATORIOS
+    // ----------------------
     const handleSubmit = useCallback(async () => {
         if (!isFormValid) {
             Alert.alert("Campos incompletos", "Por favor, completa todos los campos del formulario.");
             return;
         }
 
-        // Determinar el ID del veterinario (ya sea el asignado o el seleccionado)
         const vetId = selectedPet?.primary_vet_id || selectedVetId;
-
         if (!vetId) {
             Alert.alert("Error", "Debes seleccionar un veterinario para esta mascota.");
             return;
@@ -147,10 +140,11 @@ export function useAppointmentForm(navigation) {
             const conflict = await checkAppointmentConflict(vetId, appointmentTime);
             if (conflict) {
                 Alert.alert("Horario no disponible", `Ya existe una cita con este veterinario en este horario. Por favor, selecciona otro.`);
-                setSaving(false); return;
+                setSaving(false);
+                return;
             }
 
-            // 2. OBTENER IDs Y CHEQUEAR CLÍNICA
+            // 2. Obtener clínica del veterinario
             const { data: vetProfileData, error: vetProfileError } = await supabase
                 .from('profiles')
                 .select('clinic_id')
@@ -158,18 +152,17 @@ export function useAppointmentForm(navigation) {
                 .single();
 
             if (vetProfileError) throw vetProfileError;
-
             if (!vetProfileData || !vetProfileData.clinic_id) {
                 throw new Error(`El veterinario seleccionado no tiene una clínica asignada.`);
             }
             const clinicId = vetProfileData.clinic_id;
 
-            // c. Obtener ID de estado 'Pendiente'
+            // 3. Obtener ID de estado 'Pendiente'
             const { data: statusData } = await supabase.from('appointment_status').select('id').eq('status', 'Pendiente').single();
             if (!statusData) throw new Error("Estado 'Pendiente' no encontrado en BD.");
             const pendingStatusId = statusData.id;
 
-            // 3. Insertar Cita
+            // 4. Insertar Cita
             const serviceName = SERVICE_CATEGORIES.find(s => s.id === selectedType)?.name || selectedType;
             const reasonWithService = `${serviceName}: ${reason.trim()}`;
 
@@ -184,27 +177,47 @@ export function useAppointmentForm(navigation) {
             }).select().single();
             if (insertError) throw insertError;
 
-            // 3.5. SI LA MASCOTA NO TENÍA VET, ASIGNARLO AHORA
+            // 5. Si la mascota no tenía vet, asignarlo
             if (!selectedPet.primary_vet_id) {
                 await supabase.from('pets').update({ primary_vet_id: vetId }).eq('id', selectedPetId);
             }
 
-            // 4. Notificación
-            await supabase.from('notifications').insert({ user_id: vetId, type: 'new_appointment', title: `Nueva solicitud para ${selectedPet.name}`, content: `Cita solicitada para el ${moment(appointmentTime).format('LLL')}.`, link_id: newAppointment.id });
+            // 6. Notificación in-app al veterinario
+            await supabase.from('notifications').insert({
+                user_id: vetId,
+                type: 'new_appointment',
+                title: `Nueva solicitud para ${selectedPet.name}`,
+                content: `Cita solicitada para el ${moment(appointmentTime).format('LLL')}.`,
+                link_id: newAppointment.id
+            });
+
+            // 7. 🔔 PROGRAMAR RECORDATORIOS PUSH (24h y 1h antes)
+            try {
+                await scheduleAppointmentReminders(
+                    appointmentTime,
+                    selectedPet.name,
+                    newAppointment.id
+                );
+                console.log('Recordatorios de cita programados exitosamente');
+            } catch (reminderError) {
+                console.warn('No se pudieron programar recordatorios:', reminderError);
+                // No bloqueamos el flujo si falla el recordatorio
+            }
 
             Alert.alert("Éxito", "Tu solicitud de cita ha sido enviada y está pendiente de aprobación.");
             navigation.goBack();
         } catch (error) {
             Alert.alert("Error", error.message || "No se pudo solicitar la cita.");
-        } finally { setSaving(false); }
+        } finally {
+            setSaving(false);
+        }
     }, [isFormValid, date, time, reason, selectedPet, selectedPetId, selectedType, selectedVetId, checkAppointmentConflict, navigation]);
 
-
     // ----------------------
-    // ACCIONES DE UI (Pasadas al componente)
+    // ACCIONES DE UI
     // ----------------------
     const actions = {
-        updatePetId: (id) => { setSelectedPetId(id); setSelectedVetId(null); }, // Reset vet selection on pet change
+        updatePetId: (id) => { setSelectedPetId(id); setSelectedVetId(null); },
         updateVetId: setSelectedVetId,
         updateServiceId: setSelectedType,
         updateReason: setReason,
@@ -252,7 +265,7 @@ export function useAppointmentForm(navigation) {
         isFormValid,
         displayDate: moment(date).format('DD / MM / YYYY'),
         displayTime: moment(time).format('HH:mm A'),
-        needsVetSelection: selectedPetId && !selectedPet?.primary_vet_id // Flag para UI
+        needsVetSelection: selectedPetId && !selectedPet?.primary_vet_id
     };
 
     return { state, actions, selectors };

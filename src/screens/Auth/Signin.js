@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../api/Supabase.js';
 import AuthLayout from '../../components/AuthLayout.js';
-import { UnderlineInput, PrimaryButton, EyeToggle } from '../../components/FormBits.js';
+import { UnderlineInput, PrimaryButton, EyeToggle, LinkText } from '../../components/FormBits.js';
 import { validateEmail, validateRequired } from '../../utils/validation.js';
+import { COLORS, FONTS } from '../../theme/theme.js';
 
 export default function SignIn({ navigation }) {
   const [email, setEmail] = useState('');
@@ -14,7 +16,6 @@ export default function SignIn({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Esta es la función que se ejecuta al presionar "LOG IN"
   const onSignIn = async () => {
     setError('');
     setLoading(true);
@@ -30,76 +31,134 @@ export default function SignIn({ navigation }) {
         throw new Error('El formato del correo electrónico no es válido.');
       }
 
-      // Intenta iniciar sesión con el email y la contraseña
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
       });
 
-      // Si Supabase devuelve un error, lo mostramos
       if (loginError) {
         throw loginError;
       }
 
-      // Si el inicio de sesión es exitoso, nuestro AuthContext
-      // se encargará del resto automáticamente. No necesitamos hacer más nada aquí.
-
     } catch (err) {
-      // Muestra un mensaje de error amigable al usuario
       console.error('Error al iniciar sesión:', err.message);
       setError(err.message === 'Invalid login credentials'
         ? 'Email o contraseña incorrectos.'
         : err.message);
     } finally {
-      // Pase lo que pase, dejamos de mostrar el indicador de carga
       setLoading(false);
     }
   };
 
-  // Esta es la parte visual de la pantalla (la UI)
   return (
     <AuthLayout
       activeTab="login"
       onTabChange={() => navigation.replace('SignUp', { prefillEmail: email.trim().toLowerCase() })}
-      title="Welcome to CuidaColitas"
+      title="Bienvenido de nuevo"
     >
+      {/* Input de Email con icono */}
       <UnderlineInput
-        placeholder="E-mail"
+        icon="mail-outline"
+        placeholder="Correo electrónico"
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
-      <View style={{ position: 'relative' }}>
+
+      {/* Input de Contraseña con icono y toggle */}
+      <View style={styles.passwordContainer}>
         <UnderlineInput
-          placeholder="Password"
+          icon="lock-closed-outline"
+          placeholder="Contraseña"
           secureTextEntry={!show}
           value={password}
           onChangeText={setPassword}
-          style={{ paddingRight: 44, marginBottom: 6 }}
+          style={{ paddingRight: 44 }}
         />
         <EyeToggle shown={show} onToggle={() => setShow(s => !s)} />
       </View>
 
-      {/* Muestra el mensaje de error si existe */}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {/* Mensaje de error */}
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={18} color={COLORS.red} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
 
-      {/* Botón principal para iniciar sesión */}
-      <PrimaryButton title={loading ? 'Ingresando...' : 'LOG IN'} onPress={onSignIn} disabled={loading} />
+      {/* Botón de iniciar sesión */}
+      <PrimaryButton
+        title="INICIAR SESIÓN"
+        onPress={onSignIn}
+        loading={loading}
+        disabled={loading}
+        icon="log-in-outline"
+      />
 
-      {/* Texto para ir a la pantalla de recuperar contraseña */}
-      <Text
-        onPress={() => navigation.navigate('ForgotPassword', { prefillEmail: email.trim().toLowerCase() })}
-        style={styles.switchText}
-      >
-        Forgot Password?
+      {/* Link para recuperar contraseña */}
+      <View style={styles.forgotContainer}>
+        <LinkText
+          onPress={() => navigation.navigate('ForgotPassword', { prefillEmail: email.trim().toLowerCase() })}
+        >
+          ¿Olvidaste tu contraseña?
+        </LinkText>
+      </View>
+
+      {/* Separador decorativo */}
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Ionicons name="paw" size={16} color={COLORS.secondary} style={{ marginHorizontal: 12 }} />
+        <View style={styles.dividerLine} />
+      </View>
+
+      {/* Texto informativo */}
+      <Text style={styles.infoText}>
+        Al iniciar sesión, aceptas nuestros términos y condiciones de servicio.
       </Text>
     </AuthLayout>
   );
 }
 
-// Estos son los estilos para los componentes de la pantalla
 const styles = StyleSheet.create({
-  errorText: { color: 'red', textAlign: 'center', marginBottom: 10, marginTop: 5 },
-  switchText: { textAlign: 'center', marginTop: 15, color: '#013847', fontWeight: '500' },
+  passwordContainer: {
+    position: 'relative',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.red + '15',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: COLORS.red,
+    marginLeft: 8,
+    flex: 1,
+    fontFamily: FONTS.PoppinsRegular,
+    fontSize: 13,
+  },
+  forgotContainer: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.secondary + '50',
+  },
+  infoText: {
+    textAlign: 'center',
+    fontFamily: FONTS.PoppinsRegular,
+    fontSize: 11,
+    color: COLORS.primary + '60',
+    lineHeight: 16,
+  },
 });

@@ -1,12 +1,27 @@
 // App.js
 
 import 'react-native-url-polyfill/auto';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import { COLORS } from './src/theme/theme';
+import AnimatedSplash from './src/components/AnimatedSplash';
+
+// Prevenir que splash nativo se oculte automáticamente
+SplashScreen.preventAutoHideAsync().catch(() => { });
+
+// --- REACT QUERY (CACHÉ) ---
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, queryPersister } from './src/config/queryClient';
+
+// --- NOTIFICACIONES PUSH ---
+import {
+  initializeNotifications,
+  handleNotificationResponse
+} from './src/services/notificationService';
 
 // --- NUESTRAS IMPORTACIONES ---
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -129,15 +144,43 @@ function AppStack() {
   );
 }
 
-//aqui se decide que stack mostrar
+// Aqui se decide que stack mostrar
 function RootNavigator() {
   const { session, loading, isMaintenance, profile } = useAuth();
+  const navigationRef = useRef(null);
+
+  // Estado para controlar splash animado
+  const [showSplash, setShowSplash] = useState(true);
+
   const [fontsLoaded] = useFonts({
     'Poppins-Regular': require('./src/assets/fonts/Poppins-Regular.ttf'),
     'Poppins-SemiBold': require('./src/assets/fonts/Poppins-SemiBold.ttf'),
     'Poppins-Bold': require('./src/assets/fonts/Poppins-Bold.ttf'),
   });
 
+  // Inicializar notificaciones cuando el usuario está autenticado
+  useEffect(() => {
+    if (session?.user) {
+      initializeNotifications(navigationRef.current);
+    }
+  }, [session]);
+
+  // Ocultar splash nativo inmediatamente
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => { });
+  }, []);
+
+  // Callback cuando termina la animación del splash
+  const handleSplashEnd = () => {
+    setShowSplash(false);
+  };
+
+  // Mostrar splash animado primero
+  if (showSplash) {
+    return <AnimatedSplash onAnimationEnd={handleSplashEnd} />;
+  }
+
+  // Mientras cargan fuentes o auth, mostrar loading
   if (loading || !fontsLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.primary }}>
@@ -148,7 +191,6 @@ function RootNavigator() {
 
   // Check for maintenance mode
   if (isMaintenance) {
-    // Allow admins to bypass maintenance
     const isAdmin = profile?.roles?.name === 'admin';
     if (!isAdmin) {
       return <MaintenanceScreen />;
@@ -156,7 +198,7 @@ function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {session && session.user ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );
@@ -164,8 +206,13 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: queryPersister }}
+    >
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </PersistQueryClientProvider>
   );
 }

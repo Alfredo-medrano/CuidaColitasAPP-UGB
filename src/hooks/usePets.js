@@ -5,6 +5,8 @@ import { supabase } from '../api/Supabase';
  * Hook para obtener la lista de mascotas del usuario autenticado.
  * Devuelve un objeto estandarizado con el estado del dato (data), carga (isLoading),
  * errores (error) y una función para recargar los datos (refetch).
+ * 
+ * ✅ OPTIMIZADO: Limita appointments a los últimos 6 meses para reducir data transfer.
  */
 export function usePets() {
   const [data, setData] = useState([]);
@@ -25,7 +27,12 @@ export function usePets() {
 
       const userId = user.id;
 
-      // 2. Consulta de Supabase para obtener las mascotas del cliente
+      // ✅ OPTIMIZACIÓN: Calcular fecha límite (últimos 6 meses)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const dateLimit = sixMonthsAgo.toISOString();
+
+      // 2. Consulta principal: mascotas con sus datos básicos
       const { data: petsData, error: supabaseError } = await supabase
         .from('pets')
         .select(`
@@ -37,14 +44,8 @@ export function usePets() {
             weight_kg,
             status,            
             species:species_id(name), 
-            veterinarian:primary_vet_id(name),
-            appointments (
-                id,
-                appointment_time,
-                status:appointment_status(status)
-            )
+            veterinarian:primary_vet_id(name)
         `)
-        // Filtra por el ID del usuario actual
         .eq('owner_id', userId)
         .order('name', { ascending: true });
 
@@ -52,7 +53,32 @@ export function usePets() {
         throw supabaseError;
       }
 
-      setData(petsData || []);
+      // 3. Si hay mascotas, obtener sus citas recientes (últimos 6 meses)
+      if (petsData && petsData.length > 0) {
+        const petIds = petsData.map(p => p.id);
+
+        const { data: appointmentsData } = await supabase
+          .from('appointments')
+          .select(`
+              id,
+              pet_id,
+              appointment_time,
+              status:appointment_status(status)
+          `)
+          .in('pet_id', petIds)
+          .gte('appointment_time', dateLimit)
+          .order('appointment_time', { ascending: true });
+
+        // 4. Combinar mascotas con sus citas
+        const petsWithAppointments = petsData.map(pet => ({
+          ...pet,
+          appointments: (appointmentsData || []).filter(apt => apt.pet_id === pet.id)
+        }));
+
+        setData(petsWithAppointments);
+      } else {
+        setData(petsData || []);
+      }
 
     } catch (err) {
       console.error("Error al cargar mascotas:", err.message);

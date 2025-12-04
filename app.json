@@ -8,9 +8,9 @@
     "icon": "./src/assets/Perrito_blanco.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./src/assets/welcome.png",
+      "image": "./src/assets/Perrito_blanco.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#013847"
     },
     "ios": {
       "supportsTablet": true
@@ -18,7 +18,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/Bacuna.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#013847"
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",

@@ -28,7 +28,6 @@ export default {
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.pyas.Supabase"
@@ -48,6 +47,15 @@ export default {
         "expo-image-picker",
         {
           "photosPermission": "La aplicación necesita acceso a tus fotos para que puedas seleccionar un avatar."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/Perrito_blanco.png",
+          "color": "#0B8FAC",
+          "defaultChannel": "default",
+          "sounds": []
         }
       ],
       "expo-font"

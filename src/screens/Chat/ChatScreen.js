@@ -21,6 +21,7 @@ import 'moment/locale/es';
 import { supabase } from '../../api/Supabase';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
+import { sendPushNotification } from '../../services/notificationService';
 
 export default function ChatScreen({ route, navigation }) {
     const { conversation_id, other_user_id, other_user_name } = route.params || {};
@@ -129,7 +130,7 @@ export default function ChatScreen({ route, navigation }) {
             .from('messages')
             .select('*')
             .eq('conversation_id', conversation_id)
-            .order('created_at', { ascending: false }); // Descending for inverted list
+            .order('created_at', { ascending: false });
 
         if (!error) {
             setMessages(data);
@@ -167,6 +168,17 @@ export default function ChatScreen({ route, navigation }) {
                 content: msgText,
                 is_read: false,
             });
+
+            // 🔔 ENVIAR NOTIFICACIÓN PUSH AL DESTINATARIO
+            if (other_user_id) {
+                const senderName = profile?.name || 'Alguien';
+                sendPushNotification(
+                    other_user_id,
+                    senderName,
+                    msgText,
+                    conversation_id
+                ).catch(err => console.warn('Error enviando push:', err));
+            }
         } catch (error) {
             console.error('Error enviando:', error.message);
         }
@@ -181,10 +193,6 @@ export default function ChatScreen({ route, navigation }) {
     const renderMessageItem = ({ item, index }) => {
         const isMyMessage = item.sender_id === user.id;
 
-        // Inverted List Logic:
-        // index + 1 = Older message (Visually Above)
-        // index - 1 = Newer message (Visually Below)
-
         const isOlderMessageSame = messages[index + 1]?.sender_id === item.sender_id;
         const isNewerMessageSame = messages[index - 1]?.sender_id === item.sender_id;
 
@@ -193,7 +201,6 @@ export default function ChatScreen({ route, navigation }) {
             ...(isMyMessage ? styles.myBubble : styles.otherBubble),
         };
 
-        // Adjust corners for grouping
         if (isMyMessage) {
             if (isOlderMessageSame) bubbleStyle.borderTopRightRadius = 4;
             if (isNewerMessageSame) bubbleStyle.borderBottomRightRadius = 4;
@@ -521,15 +528,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: FONTS.PoppinsRegular,
         color: '#666',
-    },
-    petStatusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    petStatusText: {
-        fontSize: 10,
-        fontFamily: FONTS.PoppinsBold,
     },
     emptyPetsContainer: {
         alignItems: 'center',

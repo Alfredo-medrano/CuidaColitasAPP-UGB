@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, ActivityIndicator, TouchableOpacity, StatusBar } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,56 +6,48 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SIZES } from '../../theme/theme';
 import { usePets } from '../../hooks/usePets';
 
-// Componente para renderizar cada tarjeta de mascota (MANTENIENDO ESTILOS ORIGINALES)
-const PetCard = ({ pet, onPress }) => {
+// ✅ OPTIMIZACIÓN: Componente memoizado para evitar re-renders innecesarios
+const PetCard = React.memo(({ pet, onPress }) => {
   const getStatusStyle = (status) => {
     switch (status) {
       case 'En Tratamiento':
         return { container: { backgroundColor: '#FFF4CC' }, text: { color: '#CDA37B' } };
       default:
-        // Si no tiene status, o es 'Activo'
         return { container: { backgroundColor: '#A8E6DC80' }, text: { color: '#027A74' } };
     }
   };
 
-  // Accedemos directamente a pet.status (string simple en el esquema)
   const petStatusName = pet.status || 'Activo';
   const statusStyle = getStatusStyle(petStatusName);
 
-  // Evitar fallos si birth_date es nulo
   const age = pet.birth_date
     ? `${new Date().getFullYear() - new Date(pet.birth_date).getFullYear()} años`
     : 'N/A';
 
-  // Calcular Próxima Cita y Última Visita
-  const getAppointmentInfo = () => {
+  // ✅ OPTIMIZACIÓN: useMemo para evitar recalcular en cada render
+  const appointmentInfo = useMemo(() => {
     if (!pet.appointments || pet.appointments.length === 0) {
       return { next: null, last: null };
     }
 
     const now = new Date();
-
-    // Ordenar citas por fecha
     const sortedAppointments = [...pet.appointments].sort((a, b) =>
       new Date(a.appointment_time) - new Date(b.appointment_time)
     );
 
-    // Próxima cita: Primera cita futura con estado válido
     const nextAppt = sortedAppointments.find(appt => {
       const apptDate = new Date(appt.appointment_time);
       const status = appt.status?.status;
       return apptDate > now && status !== 'Cancelada' && status !== 'Completada' && status !== 'Perdida';
     });
 
-    // Última visita: Última cita pasada (idealmente completada)
-    // Filtramos las pasadas y tomamos la última
     const pastAppts = sortedAppointments.filter(appt => new Date(appt.appointment_time) < now);
     const lastAppt = pastAppts.length > 0 ? pastAppts[pastAppts.length - 1] : null;
 
     return { next: nextAppt, last: lastAppt };
-  };
+  }, [pet.appointments]);
 
-  const { next, last } = getAppointmentInfo();
+  const { next, last } = appointmentInfo;
 
   const nextAppointmentDate = next
     ? new Date(next.appointment_time).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -99,10 +91,20 @@ const PetCard = ({ pet, onPress }) => {
       </View>
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // ✅ Comparación personalizada: solo re-renderiza si cambian datos relevantes
+  return (
+    prevProps.pet.id === nextProps.pet.id &&
+    prevProps.pet.name === nextProps.pet.name &&
+    prevProps.pet.status === nextProps.pet.status &&
+    prevProps.pet.appointments?.length === nextProps.pet.appointments?.length
+  );
+});
+
+// ✅ CONSTANTE: Tiempo mínimo entre refetches (30 segundos)
+const REFETCH_THROTTLE_MS = 30000;
 
 export default function MisMascotas({ navigation }) {
-  // Hook estandarizado
   const {
     data: pets,
     isLoading,
@@ -114,12 +116,23 @@ export default function MisMascotas({ navigation }) {
   const [searchTerm, setSearchTerm] = useState('');
   const isFocused = useIsFocused();
 
-  // Recargar mascotas al enfocar la pantalla
-  useEffect(() => {
-    if (isFocused) {
+  // ✅ OPTIMIZACIÓN: Throttle para evitar refetches excesivos
+  const lastRefetchTime = useRef(0);
+
+  const throttledRefetch = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefetchTime.current >= REFETCH_THROTTLE_MS) {
+      lastRefetchTime.current = now;
       refetch();
     }
-  }, [isFocused, refetch]);
+  }, [refetch]);
+
+  // Recargar mascotas al enfocar (con throttle)
+  useEffect(() => {
+    if (isFocused) {
+      throttledRefetch();
+    }
+  }, [isFocused, throttledRefetch]);
 
   // Filtrado local por nombre
   useEffect(() => {
